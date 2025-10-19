@@ -1,0 +1,32 @@
+{
+  "name": "telegram-wechat-to-telegraph-bot",
+  "version": "1.0.0",
+  "description": "Telegram bot that converts WeChat articles to Telegraph pages",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:github": "node scripts/deploy-github.js",
+    "setup": "node setup.js",
+    "status": "node status-check.js",
+    "d1:create": "wrangler d1 create wechat-bot-db",
+    "d1:migrations": "wrangler d1 migrations apply wechat-bot-db --remote",
+    "d1:migrations:local": "wrangler d1 migrations apply wechat-bot-db --local",
+    "secrets:set": "node scripts/set-secrets.js",
+    "secrets:github": "node scripts/set-github-secrets.js",
+    "test": "node scripts/test-connection.js",
+    "lint:check": "echo 'No linter configured'",
+    "lint:fix": "echo 'No linter configured'",
+    "github:check": "node scripts/github-deploy-check.js",
+    "github:secrets-guide": "node scripts/set-github-secrets.js"
+  },
+  "keywords": ["telegram", "bot", "telegraph", "wechat", "cloudflare-workers"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "htmlparser2": "^9.0.0"
+  }
+}
