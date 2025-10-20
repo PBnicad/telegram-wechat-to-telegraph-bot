@@ -1,284 +1,93 @@
 # Telegram 微信公众号转 Telegraph Bot
 
-[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/PBnicad/telegram-wechat-to-telegraph-bot)
-
-一个运行在 Cloudflare Workers 上的 Telegram 机器人，可以将微信公众号文章转换为 Telegraph 格式，并支持频道管理和消息发送功能。
+一个运行在 Cloudflare Workers 上的 Telegram 机器人，用于将微信公众号文章转换为 Telegraph 页面。当前版本专注于文章转换，不包含频道管理、数据库或管理员端点。
 
 ## 功能特性
 
-✅ **文章转换**: 自动将微信公众号文章转换为 Telegraph 页面
-✅ **智能解析**: 提取文章标题、作者、内容和摘要
-✅ **频道管理**: 支持绑定多个 Telegram 频道
-✅ **一键发送**: 转换后可选择发送到指定频道
-✅ **用户友好**: 直观的按钮界面和交互体验
-✅ **数据持久化**: 使用 Cloudflare D1 数据库存储数据
-✅ **边缘计算**: 基于 Cloudflare Workers 全球部署
+- 文章转换：将微信文章链接转换为 Telegraph 页面
+- 智能解析：提取标题、作者和正文内容
+- 简洁交互：直接发送链接即可使用
+- 边缘部署：基于 Cloudflare Workers，响应快速、稳定
 
 ## 技术架构
 
-- **运行环境**: Cloudflare Workers
-- **数据库**: Cloudflare D1 (SQLite)
-- **爬虫方案**: 自定义爬虫（fetch API + HTML解析）
-- **API集成**: Telegram Bot API, Telegraph API
+- 运行环境：Cloudflare Workers
+- 解析/转换：自研 WeChat Parser + Telegraph API
+- 交互：Telegram Bot API
 
 ## 快速开始
 
-### 🚀 部署方式
-
-#### 方式一：GitHub Actions 自动部署（推荐）
-
-最简单的部署方式，适合新手和快速体验：
-
-1. **Fork 本仓库**
-2. **设置 GitHub Secrets**（3个必需的secrets）
-   - `CLOUDFLARE_API_TOKEN`: Cloudflare API 令牌
-   - `TELEGRAM_BOT_TOKEN`: Telegram Bot 令牌
-   - `SUPER_ADMIN_ID`: 您的 Telegram 用户 ID
-3. **推送代码触发自动部署**
-
-📖 **详细指南**: 查看 [GitHub Actions 部署指南](GITHUB_DEPLOYMENT.md)
-
-#### 方式二：手动部署
-
-适合需要自定义配置的用户：
-
-<details>
-<summary>点击展开手动部署步骤</summary>
-
-### 1. 准备工作
-
-1. **创建 Telegram Bot**
-   - 与 @BotFather 对话
-   - 使用 `/newbot` 命令创建新机器人
-   - 获取 Bot Token
-
-2. **获取 Telegraph Access Token** (可选)
-   - 机器人会自动创建 Telegraph 账户
-   - 也可以手动创建并配置 Access Token
-
-### 2. 安装依赖
-
+### 1. 安装依赖
 ```bash
 npm install
 ```
 
-### 3. 配置环境变量
-
-编辑 `wrangler.toml` 文件，添加必要的环境变量：
-
-```toml
-[vars]
-# 这些将在部署后通过 secrets 设置
-# TELEGRAM_BOT_TOKEN = "your-bot-token"
-# TELEGRAPH_ACCESS_TOKEN = "your-telegraph-access-token"
-# ADMIN_API_KEY = "your-admin-api-key"
-```
-
-### 4. 创建和配置数据库
-
+### 2. 设置 Secrets
 ```bash
-# 创建 D1 数据库
-npx wrangler d1 create wechat-bot-db
-
-# 记录返回的 database_id，更新 wrangler.toml
-
-# 执行数据库迁移
-npx wrangler d1 migrations apply wechat-bot-db --remote
-```
-
-### 5. 设置 Secrets
-
-```bash
-# 设置 Telegram Bot Token
+# 必需：Telegram Bot Token（从 @BotFather 获取）
 npx wrangler secret put TELEGRAM_BOT_TOKEN
 
-# 设置 Telegraph Access Token (可选)
+# 可选：Telegraph Access Token（不设置则自动创建）
 npx wrangler secret put TELEGRAPH_ACCESS_TOKEN
-
-# 设置管理员 API Key
-npx wrangler secret put ADMIN_API_KEY
 ```
 
-### 6. 部署到 Cloudflare Workers
-
+### 3. 部署到 Cloudflare Workers
 ```bash
 npm run deploy
 ```
 
-### 7. 设置 Webhook
-
-部署成功后，获取 Workers URL，设置 Webhook：
-
+### 4. 设置 Webhook
+部署成功后，使用以下命令设置 Webhook（替换 YOUR_BOT_TOKEN 和 YOUR_WORKER_URL）：
 ```bash
-# 使用 curl 设置 webhook
-curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
+curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook" \
      -H "Content-Type: application/json" \
-     -d '{"url": "https://your-worker-url.workers.dev"}'
+     -d '{"url": "https://YOUR_WORKER_URL.workers.dev"}'
 ```
-
-</details>
 
 ## 使用说明
 
-### 基本命令
+- `/start`：显示欢迎信息
+- `/help`：查看帮助
+- 直接发送微信公众号文章链接进行转换
 
-- `/start` - 开始使用机器人
-- `/help` - 查看帮助信息
-- `/mychannels` - 查看绑定的频道
-- `/addchannel` - 添加新频道
-- `/removechannel` - 移除频道绑定
-- `/stats` - 查看使用统计
-- `/settings` - 查看个人设置
+## 文章转换流程
 
-### 频道管理
-
-1. **添加频道**
-   - 将机器人添加到目标频道
-   - 在频道中发送 `/addchannel` 命令
-   - 机器人会自动注册频道
-
-2. **发送文章到频道**
-   - 转换文章后，选择目标频道
-   - 点击对应按钮即可发送
-
-### 文章转换
-
-1. 发送微信公众号文章链接
-2. 机器人自动获取并解析内容
+1. 发送微信公众号文章链接（以 `https://mp.weixin.qq.com/s` 开头）
+2. 机器人获取并解析文章内容
 3. 创建 Telegraph 页面
-4. 返回原链接和 Telegraph 链接
-5. 可选择发送到绑定频道
-
-## API 管理
-
-机器人提供了管理 API 端点（需要 API Key）：
-
-### 健康检查
-```bash
-GET /admin/health
-Headers: X-API-Key: your-admin-api-key
-```
-
-### 获取统计信息
-```bash
-GET /admin/stats
-Headers: X-API-Key: your-admin-api-key
-```
-
-### 设置 Webhook
-```bash
-POST /admin/webhook
-Headers: X-API-Key: your-admin-api-key
-Content-Type: application/json
-
-{
-  "url": "https://your-webhook-url"
-}
-```
-
-### 获取机器人信息
-```bash
-GET /admin/bot-info
-Headers: X-API-Key: your-admin-api-key
-```
+4. 返回生成的 Telegraph 链接
 
 ## 开发指南
 
-### 本地开发
-
 ```bash
-# 启动开发服务器
+# 启动本地开发服务器
 npm run dev
-
-# 使用本地数据库
-npx wrangler d1 migrations apply wechat-bot-db --local
 ```
 
-### 项目结构
+## 项目结构
 
 ```
 src/
-├── index.js              # 主入口文件
-├── handlers/             # 消息处理器
+├── index.js              # Workers 入口
+├── handlers/
 │   ├── message.js        # 文本消息处理
-│   └── callback.js       # 回调查询处理
-├── services/             # 服务层
+│   └── callback.js       # 回调查询处理（仅保留转换与取消）
+├── services/
 │   ├── telegram.js       # Telegram API 服务
-│   ├── crawler.js        # 爬虫服务
-│   └── telegraph.js      # Telegraph API 服务
-├── database/             # 数据库操作
-│   └── db.js            # 数据库类
-└── utils/               # 工具函数
-    ├── constants.js     # 常量定义
-    └── helpers.js       # 辅助函数
+│   ├── telegraph.js      # Telegraph API 服务
+│   └── wechat-parser.js  # 微信文章解析器
+└── utils/
+    ├── constants.js      # 常量定义
+    ├── helpers.js        # 辅助函数
+    └── wechat-utils.js   # 微信工具函数
 ```
 
-### 添加新功能
+## 常见问题
 
-1. 在相应的服务类中添加新方法
-2. 在处理器中实现业务逻辑
-3. 更新数据库结构（如需要）
-4. 添加相应的命令和用户界面
-
-## 故障排除
-
-### 常见问题
-
-1. **Webhook 设置失败**
-   - 确保 Workers URL 正确
-   - 检查 Bot Token 是否有效
-   - 确认网络连接正常
-
-2. **文章转换失败**
-   - 检查链接是否为有效的微信公众号文章
-   - 确认网络连接正常
-   - 查看日志了解具体错误
-
-3. **频道发送失败**
-   - 确认机器人在频道中有发送权限
-   - 检查频道是否正确绑定
-   - 确认用户有管理权限
-
-### 日志查看
-
-```bash
-# 查看实时日志
-npx wrangler tail
-
-# 查看特定时间段的日志
-npx wrangler tail --since=1h
-```
-
-## 贡献指南
-
-1. Fork 本项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
+- 链接无效：确认链接以 `https://mp.weixin.qq.com/s` 开头
+- 转换失败：稍后重试，或检查网络连接
+- Webhook 未生效：检查 Worker URL 和 Bot Token 是否正确
 
 ## 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
-
-## 支持
-
-如果您遇到问题或有建议，请：
-
-1. 查看本文档的故障排除部分
-2. 搜索现有的 Issues
-3. 创建新的 Issue 描述问题
-4. 联系开发者
-
-## 更新日志
-
-### v1.0.0
-- ✨ 初始版本发布
-- ✅ 基本文章转换功能
-- ✅ 频道管理功能
-- ✅ 用户界面和交互
-- ✅ 数据持久化
-
----
-
-**注意**: 本项目仅供学习和个人使用，请遵守相关平台的使用条款和法律法规。
+MIT

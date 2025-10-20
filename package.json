@@ -6,12 +6,7 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "deploy:github": "node scripts/deploy-github.js",
-    "setup": "node setup.js",
     "status": "node status-check.js",
-    "d1:create": "wrangler d1 create wechat-bot-db",
-    "d1:migrations": "wrangler d1 migrations apply wechat-bot-db --remote",
-    "d1:migrations:local": "wrangler d1 migrations apply wechat-bot-db --local",
     "secrets:set": "node scripts/set-secrets.js",
     "secrets:github": "node scripts/set-github-secrets.js",
     "test": "node scripts/test-connection.js",

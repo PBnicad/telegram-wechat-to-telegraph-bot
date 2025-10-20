@@ -3,9 +3,7 @@
  * Cloudflare Workers主入口文件
  */
 
-import { Database } from './database/db.js';
 import { TelegramService } from './services/telegram.js';
-import { CrawlerService } from './services/crawler.js';
 import { TelegraphService } from './services/telegraph.js';
 import { MessageHandler } from './handlers/message.js';
 import { CallbackHandler } from './handlers/callback.js';
@@ -17,67 +15,7 @@ export default {
             const url = new URL(request.url);
             const path = url.pathname;
 
-            // 处理健康检查
-            if (path === '/health') {
-                try {
-                    const db = new Database(env.DB);
-                    const stats = await db.getStats();
-                    return new Response(JSON.stringify({
-                        status: 'healthy',
-                        timestamp: new Date().toISOString(),
-                        services: {
-                            database: 'ok',
-                            telegram: env.TELEGRAM_BOT_TOKEN ? 'ok' : 'not_configured',
-                            telegraph: env.TELEGRAPH_ACCESS_TOKEN ? 'ok' : 'not_configured'
-                        },
-                        stats: stats
-                    }), {
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                } catch (error) {
-                    return new Response(JSON.stringify({
-                        status: 'unhealthy',
-                        error: error.message,
-                        timestamp: new Date().toISOString()
-                    }), {
-                        status: 500,
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                }
-            }
 
-            // 处理管理 API 路由
-            if (path.startsWith('/admin/')) {
-                const apiKey = request.headers.get('X-API-Key');
-                const adminApiKey = env?.ADMIN_API_KEY;
-                if (!adminApiKey || apiKey !== adminApiKey) {
-                    return new Response('Unauthorized', { status: 401 });
-                }
-
-                if (path === '/admin/stats') {
-                    try {
-                        const db = new Database(env.DB);
-                        const stats = await db.getStats();
-                        return new Response(JSON.stringify({
-                            success: true,
-                            data: stats,
-                            timestamp: new Date().toISOString()
-                        }), {
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                    } catch (error) {
-                        return new Response(JSON.stringify({
-                            success: false,
-                            error: error.message
-                        }), {
-                            status: 500,
-                            headers: { 'Content-Type': 'application/json' }
-                        });
-                    }
-                }
-
-                return new Response('Not Found', { status: 404 });
-            }
 
             // Telegram Webhook 处理 (只接受 POST)
             if (request.method !== 'POST') {
@@ -88,8 +26,6 @@ export default {
                         service: 'Telegram WeChat to Telegraph Bot',
                         version: '1.0.0',
                         endpoints: {
-                            health: '/health',
-                            admin: '/admin/stats (requires API key)',
                             webhook: '/ (Telegram webhook endpoint)'
                         }
                     }), {
@@ -102,9 +38,8 @@ export default {
                     message: 'This endpoint only accepts POST requests for Telegram webhooks',
                     allowed_methods: ['POST'],
                     endpoints: {
-                        health: 'GET /health',
                         info: 'GET /',
-                        admin: 'GET /admin/stats'
+                        webhook: 'POST /'
                     }
                 }), {
                     status: 405,
@@ -121,20 +56,18 @@ export default {
                 contentLength: request.headers.get('content-length')
             });
 
-            // 初始化服务
-            const db = new Database(env.DB);
+            // 初始化服务（移除数据库与爬虫依赖）
             const telegramService = new TelegramService(env.TELEGRAM_BOT_TOKEN);
-            const crawlerService = new CrawlerService();
             const telegraphService = new TelegraphService(env.TELEGRAPH_ACCESS_TOKEN);
 
             // 获取解析器配置
             const wechatConfig = wechatConfigManager.getConfig(env.WECHAT_PARSER_QUALITY || 'default');
 
-            // 初始化处理器（使用新的配置）
+            // 初始化处理器（仅保留必要服务）
             const messageHandler = new MessageHandler(
-                db,
+                null,
                 telegramService,
-                crawlerService,
+                null,
                 telegraphService,
                 {
                     parseTimeout: wechatConfig.timeout,
@@ -142,7 +75,7 @@ export default {
                     proxy: env.PROXY_URL || wechatConfig.proxy
                 }
             );
-            const callbackHandler = new CallbackHandler(db, telegramService, crawlerService, telegraphService);
+            const callbackHandler = new CallbackHandler(null, telegramService, null, telegraphService);
 
             let update;
             try {

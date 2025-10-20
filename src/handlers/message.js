@@ -56,7 +56,7 @@ export class MessageHandler {
      * @returns {Promise<void>}
      */
     async handleCommand(message) {
-        const { text, from, chat } = message;
+        const { text } = message;
         const command = text.toLowerCase().split(' ')[0];
 
         switch (command) {
@@ -64,16 +64,6 @@ export class MessageHandler {
                 return await this.handleStart(message);
             case Commands.HELP:
                 return await this.handleHelp(message);
-            case Commands.MYCHANNELS:
-                return await this.handleMyChannels(message);
-            case Commands.ADDCHANNEL:
-                return await this.handleAddChannel(message);
-            case Commands.REMOVECHANNEL:
-                return await this.handleRemoveChannel(message);
-            case Commands.STATS:
-                return await this.handleStats(message);
-            case Commands.SETTINGS:
-                return await this.handleSettings(message);
             default:
                 return await this.handleUnknownCommand(message);
         }
@@ -97,159 +87,15 @@ export class MessageHandler {
         await this.telegram.sendMessage(chat.id, Messages.HELP);
     }
 
-    /**
-     * 处理/mychannels命令
-     * @param {object} message
-     */
-    async handleMyChannels(message) {
-        const { from, chat } = message;
-        const channels = await this.db.getUserChannels(from.id);
+    // 已移除: handleMyChannels（频道功能已删除）
 
-        if (channels.length === 0) {
-            await this.telegram.sendMessage(chat.id, Messages.NO_CHANNELS);
-            return;
-        }
+    // 已移除: handleAddChannel（频道功能已删除）
 
-        const channelList = channels.map((channel, index) => {
-            return `${index + 1}. ${channel.title || '未命名频道'} (${channel.channel_id})`;
-        }).join('\n');
+    // 已移除: handleRemoveChannel（频道功能已删除）
 
-        const responseText = `📋 您的频道列表：\n\n${channelList}`;
-        await this.telegram.sendMessage(chat.id, responseText);
-    }
+    // 已移除: handleStats（统计功能已删除）
 
-    /**
-     * 处理/addchannel命令
-     * @param {object} message
-     */
-    async handleAddChannel(message) {
-        const { chat, from } = message;
-
-        // 检查是否在群组或频道中
-        if (chat.type === 'private') {
-            const instructions = `➕ 添加频道步骤：
-
-1. 将我添加到要管理的频道中
-2. 在频道中发送 /addchannel 命令
-3. 我将自动注册该频道
-
-注意：您需要在频道中具有管理员权限。`;
-
-            await this.telegram.sendMessage(chat.id, instructions);
-            return;
-        }
-
-        // 在频道中处理添加
-        if (chat.type === 'channel' || chat.type === 'supergroup') {
-            try {
-                // 检查用户是否为管理员
-                const isAdmin = await this.telegram.isChatAdmin(chat.id, from.id);
-                if (!isAdmin) {
-                    await this.telegram.sendMessage(chat.id, Messages.ADMIN_REQUIRED);
-                    return;
-                }
-
-                // 创建或获取频道信息
-                await this.db.createChannel(
-                    chat.id,
-                    chat.title || '未命名频道',
-                    chat.username,
-                    from.id
-                );
-
-                // 绑定用户到频道
-                const channel = await this.db.getChannel(chat.id);
-                if (channel) {
-                    await this.db.bindUserToChannel(from.id, channel.id);
-                    await this.telegram.sendMessage(chat.id, Messages.CHANNEL_ADDED);
-                }
-
-            } catch (error) {
-                console.error('Error adding channel:', error);
-                await this.telegram.sendMessage(chat.id, Messages.ERROR_OCCURRED);
-            }
-        }
-    }
-
-    /**
-     * 处理/removechannel命令
-     * @param {object} message
-     */
-    async handleRemoveChannel(message) {
-        const { from, chat } = message;
-        const channels = await this.db.getUserChannels(from.id);
-
-        if (channels.length === 0) {
-            await this.telegram.sendMessage(chat.id, Messages.NO_CHANNELS);
-            return;
-        }
-
-        // 创建频道选择键盘
-        const keyboard = channels.map(channel => [{
-            text: channel.title || `Channel ${channel.channel_id}`,
-            callback_data: `remove_channel:${channel.id}`
-        }]);
-
-        await this.telegram.sendMessageWithKeyboard(
-            chat.id,
-            '🗑️ 选择要移除的频道：',
-            keyboard
-        );
-    }
-
-    /**
-     * 处理/stats命令
-     * @param {object} message
-     */
-    async handleStats(message) {
-        const { chat } = message;
-
-        try {
-            const stats = await this.db.getStats();
-            const userStats = await this.db.getUserArticles(chat.id, 1);
-
-            const statsText = `📊 机器人统计信息：
-
-👥 总用户数：${stats.totalUsers}
-📱 总频道数：${stats.totalChannels}
-📄 总文章数：${stats.totalArticles}
-📅 今日文章数：${stats.articlesToday}
-📝 您的文章数：${userStats.results?.length || 0}`;
-
-            await this.telegram.sendMessage(chat.id, statsText);
-        } catch (error) {
-            console.error('Error getting stats:', error);
-            await this.telegram.sendMessage(chat.id, Messages.ERROR_OCCURRED);
-        }
-    }
-
-    /**
-     * 处理/settings命令
-     * @param {object} message
-     */
-    async handleSettings(message) {
-        const { from, chat } = message;
-
-        try {
-            const settings = await this.db.getUserSettings(from.id);
-            const channels = await this.db.getUserChannels(from.id);
-
-            const settingsText = `⚙️ 您的设置：
-
-📱 默认频道：${settings?.default_channel_id ? '已设置' : '未设置'}
-🔄 自动发送到频道：${settings?.auto_send_to_channel ? '开启' : '关闭'}
-🌐 语言：${settings?.language || 'zh-CN'}
-
-要修改设置，请使用以下命令：
-/setdefaultchannel - 设置默认频道
-/autosend - 切换自动发送设置`;
-
-            await this.telegram.sendMessage(chat.id, settingsText);
-        } catch (error) {
-            console.error('Error getting settings:', error);
-            await this.telegram.sendMessage(chat.id, Messages.ERROR_OCCURRED);
-        }
-    }
+    // 已移除: handleSettings（设置功能已删除）
 
     /**
      * 处理未知命令
@@ -415,26 +261,7 @@ export class MessageHandler {
         return `<a href="${originalUrl}">阅读原文</a> | <a href="${telegraphPage.url}">预览</a>`;
     }
 
-    /**
-     * 构建频道选择键盘
-     * @param {Array} channels
-     * @param {string} telegraphUrl
-     * @returns {Array}
-     */
-    buildChannelKeyboard(channels, telegraphUrl) {
-        const keyboard = [
-            ...channels.map(channel => [{
-                text: `📤 发送到 ${channel.title || '未命名频道'}`,
-                callback_data: `send_to_channel:${telegraphUrl}:${channel.id}`
-            }]),
-            [
-                { text: '📋 复制链接', callback_data: `copy_link:${telegraphUrl}` },
-                { text: '✅ 完成', callback_data: 'conversion_complete' }
-            ]
-        ];
-
-        return keyboard;
-    }
+    // 已移除: buildChannelKeyboard（频道功能已删除）
 
     /**
      * 根据错误类型获取错误消息
@@ -477,22 +304,5 @@ export class MessageHandler {
         );
     }
 
-    /**
-     * 确保用户存在于数据库中
-     * @param {object} user Telegram用户对象
-     */
-    async ensureUserExists(user) {
-        try {
-            console.log('Creating user:', user.id, user.username, user.first_name, user.last_name);
-            await this.db.createUser(
-                user.id,
-                user.username,
-                user.first_name,
-                user.last_name
-            );
-            console.log('User creation completed');
-        } catch (error) {
-            console.error('Error ensuring user exists:', error);
-        }
-    }
+    // 已移除: ensureUserExists（数据库依赖已删除）
 }

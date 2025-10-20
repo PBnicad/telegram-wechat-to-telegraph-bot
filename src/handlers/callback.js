@@ -24,15 +24,6 @@ export class CallbackHandler {
             const [action, ...params] = data.split(':');
 
             switch (action) {
-                case 'send_to_channel':
-                    await this.handleSendToChannel(callbackQuery);
-                    break;
-                case 'remove_channel':
-                    await this.handleRemoveChannel(callbackQuery);
-                    break;
-                case 'select_channel':
-                    await this.handleSelectChannel(callbackQuery);
-                    break;
                 case 'conversion_complete':
                     await this.handleConversionComplete(callbackQuery);
                     break;
@@ -53,113 +44,11 @@ export class CallbackHandler {
         }
     }
 
-    /**
-     * 处理发送到频道
-     * @param {object} callbackQuery
-     */
-    async handleSendToChannel(callbackQuery) {
-        const { data, message } = callbackQuery;
-        const [_, telegraphUrl, channelId] = data.split(':');
+    // 已移除: handleSendToChannel（频道功能已删除）
 
-        try {
-            // 直接发送仅含两个超链接的消息到频道
-            const channelMessage = `<a href="${message.text.match(/https?:\/\/[^\s]+/)[0]}">阅读原文</a> | <a href="${telegraphUrl}">预览</a>`;
-            await this.telegram.sendMessage(channelId, channelMessage);
+    // 已移除: handleRemoveChannel（频道功能已删除）
 
-            // 更新原始消息为仅两个超链接
-            await this.telegram.editMessageText(
-                message.chat.id,
-                message.message_id,
-                channelMessage
-            );
-
-            // 结束回调交互
-            await this.telegram.answerCallbackQuery(callbackQuery.id, '已发送到频道');
-        } catch (error) {
-            console.error('Error sending to channel:', error);
-            await this.telegram.answerCallbackQuery(callbackQuery.id, '发送失败，请重试');
-        }
-    }
-
-    /**
-     * 处理移除频道
-     * @param {object} callbackQuery
-     */
-    async handleRemoveChannel(callbackQuery) {
-        const { id, from, message } = callbackQuery;
-        const [_, channelId] = callbackQuery.data.split(':');
-
-        try {
-            // 检查权限
-            const channel = await this.getChannelById(channelId);
-            if (!channel) {
-                await this.telegram.answerCallbackQuery(id, '频道不存在', true);
-                return;
-            }
-
-            // 只有频道添加者可以移除
-            if (channel.added_by !== from.id) {
-                await this.telegram.answerCallbackQuery(
-                    id,
-                    '只有频道添加者可以移除频道',
-                    true
-                );
-                return;
-            }
-
-            // 移除绑定
-            await this.db.unbindUserFromChannel(from.id, channelId);
-
-            // 确认操作
-            await this.telegram.answerCallbackQuery(id, '频道已移除', false);
-
-            // 更新消息
-            await this.telegram.editMessageText(
-                message.chat.id,
-                message.message_id,
-                '✅ 频道移除成功！'
-            );
-
-        } catch (error) {
-            console.error('Error removing channel:', error);
-            await this.telegram.answerCallbackQuery(
-                id,
-                '移除失败，请稍后重试',
-                true
-            );
-        }
-    }
-
-    /**
-     * 处理选择频道
-     * @param {object} callbackQuery
-     */
-    async handleSelectChannel(callbackQuery) {
-        const { id, from, message } = callbackQuery;
-        const [_, channelId] = callbackQuery.data.split(':');
-
-        try {
-            // 设置为默认频道
-            await this.db.updateUserSettings(from.id, {
-                defaultChannelId: parseInt(channelId)
-            });
-
-            const channel = await this.getChannelById(channelId);
-            await this.telegram.answerCallbackQuery(
-                id,
-                `已设置 ${channel?.title || '频道'} 为默认频道`,
-                false
-            );
-
-        } catch (error) {
-            console.error('Error selecting channel:', error);
-            await this.telegram.answerCallbackQuery(
-                id,
-                '设置失败，请稍后重试',
-                true
-            );
-        }
-    }
+    // 已移除: handleSelectChannel（频道功能已删除）
 
     /**
      * 处理转换完成
@@ -207,121 +96,13 @@ export class CallbackHandler {
         );
     }
 
-    /**
-     * 根据ID获取频道信息
-     * @param {string} channelId 频道ID
-     * @returns {Promise<object|null>}
-     */
-    async getChannelById(channelId) {
-        try {
-            // 这里需要在Database类中添加相应的方法
-            const stmt = this.db.db.prepare('SELECT * FROM channels WHERE id = ?');
-            return await stmt.first(parseInt(channelId));
-        } catch (error) {
-            console.error('Error getting channel by ID:', error);
-            return null;
-        }
-    }
+    // 已移除: getChannelById（数据库依赖已删除）
 
-    /**
-     * 处理频道设置相关回调
-     * @param {object} callbackQuery
-     */
-    async handleChannelSettings(callbackQuery) {
-        const { from, message } = callbackQuery;
-        const [_, channelId, action] = callbackQuery.data.split(':');
+    // 已移除: handleChannelSettings（频道功能已删除）
 
-        try {
-            const channel = await this.getChannelById(channelId);
-            if (!channel) {
-                await this.telegram.answerCallbackQuery(
-                    callbackQuery.id,
-                    '频道不存在',
-                    true
-                );
-                return;
-            }
+    // 已移除: setDefaultChannel（频道功能已删除）
 
-            switch (action) {
-                case 'set_default':
-                    await this.setDefaultChannel(from.id, channelId);
-                    break;
-                case 'toggle_auto':
-                    await this.toggleAutoSend(from.id, channelId);
-                    break;
-                case 'view_stats':
-                    await this.viewChannelStats(channelId);
-                    break;
-                default:
-                    await this.telegram.answerCallbackQuery(
-                        callbackQuery.id,
-                        '未知操作',
-                        true
-                    );
-            }
+    // 已移除: toggleAutoSend（频道功能已删除）
 
-        } catch (error) {
-            console.error('Error handling channel settings:', error);
-            await this.telegram.answerCallbackQuery(
-                callbackQuery.id,
-                '操作失败',
-                true
-            );
-        }
-    }
-
-    /**
-     * 设置默认频道
-     * @param {number} userId 用户ID
-     * @param {string} channelId 频道ID
-     */
-    async setDefaultChannel(userId, channelId) {
-        try {
-            await this.db.updateUserSettings(userId, {
-                defaultChannelId: parseInt(channelId)
-            });
-
-            const channel = await this.getChannelById(channelId);
-            // 这里需要更新消息显示频道设置已更改
-        } catch (error) {
-            console.error('Error setting default channel:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * 切换自动发送设置
-     * @param {number} userId 用户ID
-     * @param {string} channelId 频道ID
-     */
-    async toggleAutoSend(userId, channelId) {
-        try {
-            const settings = await this.db.getUserSettings(userId);
-            const newAutoSend = !(settings?.auto_send_to_channel || false);
-
-            await this.db.updateUserSettings(userId, {
-                autoSendToChannel: newAutoSend,
-                defaultChannelId: parseInt(channelId)
-            });
-
-            // 更新消息显示自动发送设置已更改
-        } catch (error) {
-            console.error('Error toggling auto send:', error);
-            throw error;
-        }
-    }
-
-    /**
-     * 查看频道统计
-     * @param {string} channelId 频道ID
-     */
-    async viewChannelStats(channelId) {
-        try {
-            // 这里需要实现频道统计功能
-            // 可以统计发送到该频道的文章数量等
-        } catch (error) {
-            console.error('Error viewing channel stats:', error);
-            throw error;
-        }
-    }
+    // 已移除: viewChannelStats（频道功能已删除）
 }

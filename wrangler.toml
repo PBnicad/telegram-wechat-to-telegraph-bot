@@ -12,19 +12,11 @@ name = "telegram-wechat-bot-dev"
 ENVIRONMENT = "production"
 
 # D1 Database configuration
-[[d1_databases]]
-binding = "DB"
-database_name = "wechat-bot-db"
-database_id = "5c10a2c2-73ac-45db-a6d9-e170cc6e7331"
 
 # Production environment
 [env.production]
 name = "telegram-wechat-bot-prod"
 
-[[env.production.d1_databases]]
-binding = "DB"
-database_name = "wechat-bot-db"
-database_id = "5c10a2c2-73ac-45db-a6d9-e170cc6e7331"
 
 # Environment variables
 # Required secrets (set using: wrangler secret put <VARIABLE_NAME>):
