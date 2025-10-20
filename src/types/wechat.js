@@ -17,6 +17,7 @@ export class WeChatParseResult {
      * @param {Date|null} options.publishTime 发布时间
      * @param {string} options.url 原始URL
      * @param {string} options.originalHtml 原始HTML内容
+     * @param {string|null} options.aiSummary AI生成总结
      */
     constructor({
         title,
@@ -27,7 +28,8 @@ export class WeChatParseResult {
         wordCount,
         publishTime,
         url,
-        originalHtml
+        originalHtml,
+        aiSummary
     }) {
         this.title = title || '';
         this.author = author || '';
@@ -38,6 +40,7 @@ export class WeChatParseResult {
         this.publishTime = publishTime || null;
         this.url = url || '';
         this.originalHtml = originalHtml || '';
+        this.aiSummary = aiSummary || null;
         this.parseTime = new Date();
     }
 

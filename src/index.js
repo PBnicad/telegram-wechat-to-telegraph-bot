@@ -73,7 +73,9 @@ export default {
                 {
                     parseTimeout: wechatConfig.timeout,
                     userAgent: wechatConfig.userAgent,
-                    proxy: env.PROXY_URL || wechatConfig.proxy
+                    proxy: env.PROXY_URL || wechatConfig.proxy,
+                    deepseekApiKey: env.DEEPSEEK_API_KEY,
+                    deepseekModel: 'deepseek-chat'
                 }
             );
             const callbackHandler = new CallbackHandler(null, telegramService, null, telegraphService);

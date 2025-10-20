@@ -4,6 +4,7 @@
 import { Messages, Commands } from '../utils/constants.js';
 import { isValidUrl, isWechatArticle, extractWeChatUrl } from '../utils/helpers.js';
 import { WeChatParser } from '../services/wechat-parser.js';
+import { DeepSeekService } from '../services/deepseek.js';
 import { WeChatParseResult, WeChatParseError } from '../types/wechat.js';
 
 export class MessageHandler {
@@ -19,6 +20,12 @@ export class MessageHandler {
             userAgent: options.userAgent || 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             proxy: options.proxy || null
         });
+
+        // 初始化DeepSeek服务
+        this.deepseekService = new DeepSeekService(
+            options.deepseekApiKey,
+            options.deepseekModel || 'deepseek-chat'
+        );
     }
 
     /**
@@ -188,6 +195,46 @@ export class MessageHandler {
                 wechatResult.author
             );
 
+            // 尝试生成AI总结
+            let aiSummary = null;
+            console.log('🤖 开始AI总结流程...');
+            console.log('DeepSeek服务配置状态:', this.deepseekService.isConfigured());
+
+            if (this.deepseekService.isConfigured()) {
+                try {
+                    console.log('📝 更新处理状态：正在生成AI总结...');
+                    await this.telegram.editMessageText(
+                        chat.id,
+                        processingMessage.message_id,
+                        `📝 已创建Telegraph页面，正在生成AI总结...`
+                    );
+
+                    console.log('🤖 调用DeepSeek API生成总结...');
+                    console.log('文章标题:', wechatResult.title);
+                    console.log('内容长度:', wechatResult.content?.length || 0);
+
+                    aiSummary = await this.deepseekService.summarizeArticle(
+                        wechatResult.title,
+                        wechatResult.content,
+                        wechatResult.author
+                    );
+
+                    console.log('✅ AI总结生成成功，长度:', aiSummary?.length || 0);
+
+                    // 将AI总结添加到结果中
+                    wechatResult.aiSummary = aiSummary;
+                    console.log('📝 AI总结已添加到结果中');
+
+                } catch (summaryError) {
+                    console.error('❌ AI总结生成失败:', summaryError);
+                    console.error('错误详情:', summaryError.message);
+                    console.error('错误堆栈:', summaryError.stack);
+                    // AI总结失败不影响主流程，继续执行
+                }
+            } else {
+                console.log('⚠️ DeepSeek服务未配置，跳过AI总结');
+            }
+
             // 保存到数据库 - 临时注释掉以调试
             // await this.db.createArticle(
             //     url,
@@ -200,7 +247,10 @@ export class MessageHandler {
             // );
 
             // 构建详细响应消息
+            console.log('🔨 构建响应消息...');
+            console.log('AI总结状态:', wechatResult.aiSummary ? '存在' : '不存在');
             const responseText = this.buildSuccessResponse(wechatResult, telegraphPage, url);
+            console.log('📤 响应消息长度:', responseText.length);
 
             // 获取用户频道 - 临时注释掉以调试
             // const channels = await this.db.getUserChannels(from.id);
@@ -264,8 +314,15 @@ export class MessageHandler {
      * @returns {string}
      */
     buildSuccessResponse(result, telegraphPage, originalUrl) {
-        // 仅返回两个超链接：原文与 Telegraph
-        return `<a href="${originalUrl}">阅读原文</a> | <a href="${telegraphPage.url}">预览</a>`;
+        // 返回三个部分：原文链接、Telegraph链接、AI总结
+        let response = `<a href="${originalUrl}">阅读原文</a> | <a href="${telegraphPage.url}">预览</a>`;
+
+        // 添加AI总结
+        if (result.aiSummary) {
+            response += `\n\n🤖 <b>AI总结</b>：\n${result.aiSummary}`;
+        }
+
+        return response;
     }
 
     // 已移除: buildChannelKeyboard（频道功能已删除）
