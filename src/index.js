@@ -7,6 +7,7 @@ import { TelegramService } from './services/telegram.js';
 import { TelegraphService } from './services/telegraph.js';
 import { MessageHandler } from './handlers/message.js';
 import { CallbackHandler } from './handlers/callback.js';
+import { InlineHandler } from './handlers/inline.js';
 import { wechatConfigManager } from './config/wechat-config.js';
 
 export default {
@@ -76,6 +77,11 @@ export default {
                 }
             );
             const callbackHandler = new CallbackHandler(null, telegramService, null, telegraphService);
+            const inlineHandler = new InlineHandler(telegramService, telegraphService, {
+                parseTimeout: wechatConfig.timeout,
+                userAgent: wechatConfig.userAgent,
+                proxy: env.PROXY_URL || wechatConfig.proxy
+            });
 
             let update;
             try {
@@ -90,6 +96,10 @@ export default {
                     callback_query: update.callback_query ? {
                         from: update.callback_query.from?.id,
                         data: update.callback_query.data?.substring(0, 50)
+                    } : null,
+                    inline_query: update.inline_query ? {
+                        from: update.inline_query.from?.id,
+                        query: update.inline_query.query?.substring(0, 50)
                     } : null
                 }, null, 2));
             } catch (error) {
@@ -107,6 +117,10 @@ export default {
                     console.log('Processing callback query from user:', update.callback_query.from.id);
                     await callbackHandler.handleCallbackQuery(update.callback_query);
                     console.log('Callback query processed successfully');
+                } else if (update.inline_query) {
+                    console.log('Processing inline query from user:', update.inline_query.from.id, 'query:', update.inline_query.query?.substring(0, 80));
+                    await inlineHandler.handleInlineQuery(update.inline_query);
+                    console.log('Inline query processed successfully');
                 } else if (update.channel_post) {
                     console.log('Processing channel post from chat:', update.channel_post.chat.id);
                     // 暂时不处理频道消息

@@ -284,4 +284,13 @@ export class TelegramService {
             [{ text: '❌ 取消', callback_data: cancelCallback }]
         ];
     }
+    async answerInlineQuery(inlineQueryId, results, options = {}) {
+        const payload = {
+            inline_query_id: inlineQueryId,
+            results,
+            ...options
+        };
+
+        return await this.request('answerInlineQuery', payload);
+    }
 }

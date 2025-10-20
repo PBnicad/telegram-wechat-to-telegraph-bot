@@ -2,7 +2,7 @@
  * 消息处理器 - 基于ParseHub架构重构
  */
 import { Messages, Commands } from '../utils/constants.js';
-import { isValidUrl, isWechatArticle } from '../utils/helpers.js';
+import { isValidUrl, isWechatArticle, extractWeChatUrl } from '../utils/helpers.js';
 import { WeChatParser } from '../services/wechat-parser.js';
 import { WeChatParseResult, WeChatParseError } from '../types/wechat.js';
 
@@ -44,6 +44,13 @@ export class MessageHandler {
             } else {
                 return await this.handleOtherUrl(message);
             }
+        }
+
+        // 处理文本中包含的微信链接
+        const embeddedWechatUrl = extractWeChatUrl(text);
+        if (embeddedWechatUrl) {
+            const patchedMessage = { ...message, text: embeddedWechatUrl };
+            return await this.handleWechatUrl(patchedMessage);
         }
 
         // 默认消息处理

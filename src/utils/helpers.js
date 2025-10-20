@@ -224,3 +224,20 @@ export async function retry(fn, maxRetries = 3, delayMs = 1000) {
 
     throw lastError;
 }
+
+export function extractWeChatUrl(text) {
+    if (!text || typeof text !== 'string') return null;
+    const urlRegex = /(https?:\/\/\S+)/g;
+    const candidates = text.match(urlRegex) || [];
+    const wechatPatterns = [
+        /https?:\/\/mp\.weixin\.qq\.com\S*/i,
+        /https?:\/\/weixin\.qq\.com\S*/i,
+        /https?:\/\/mp\.weixin\.qq\.com\/[\w\-?=&%#:/.]+/i
+    ];
+    for (const c of candidates) {
+        if (wechatPatterns.some(p => p.test(c))) {
+            return c;
+        }
+    }
+    return null;
+}
