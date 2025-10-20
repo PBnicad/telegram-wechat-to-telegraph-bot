@@ -1,0 +1,101 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Cloudflare Workers
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate code
+        run: |
+          node -c src/index.js
+          node -c src/handlers/message.js
+          node -c src/handlers/inline.js
+          node -c src/services/deepseek.js
+          node -c src/services/telegraph.js
+          node -c src/services/telegram.js
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+
+      - name: Set up secrets
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          TELEGRAPH_ACCESS_TOKEN: ${{ secrets.TELEGRAPH_ACCESS_TOKEN }}
+        run: |
+          echo "Setting up Cloudflare Workers secrets..."
+
+          # Set required secrets
+          if [ -n "$TELEGRAM_BOT_TOKEN" ]; then
+            echo "Setting TELEGRAM_BOT_TOKEN..."
+            echo "$TELEGRAM_BOT_TOKEN" | npx wrangler secret put TELEGRAM_BOT_TOKEN
+          else
+            echo "Warning: TELEGRAM_BOT_TOKEN not found in GitHub secrets"
+          fi
+
+          if [ -n "$DEEPSEEK_API_KEY" ]; then
+            echo "Setting DEEPSEEK_API_KEY..."
+            echo "$DEEPSEEK_API_KEY" | npx wrangler secret put DEEPSEEK_API_KEY
+          else
+            echo "Warning: DEEPSEEK_API_KEY not found in GitHub secrets"
+          fi
+
+          # Set optional secret
+          if [ -n "$TELEGRAPH_ACCESS_TOKEN" ]; then
+            echo "Setting TELEGRAPH_ACCESS_TOKEN..."
+            echo "$TELEGRAPH_ACCESS_TOKEN" | npx wrangler secret put TELEGRAPH_ACCESS_TOKEN
+          else
+            echo "TELEGRAPH_ACCESS_TOKEN not set (optional - will auto-create)"
+          fi
+
+      - name: Get deployment info
+        id: deployment
+        run: |
+          WORKER_URL="https://telegram-wechat-bot.nicad.workers.dev"
+          echo "worker_url=$WORKER_URL" >> $GITHUB_OUTPUT
+          echo "webhook_url=$WORKER_URL" >> $GITHUB_OUTPUT
+
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Worker URL:** ${{ steps.deployment.outputs.worker_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Webhook URL:** ${{ steps.deployment.outputs.webhook_url }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "1. Set up Telegram webhook:" >> $GITHUB_STEP_SUMMARY
+          echo '   ```bash' >> $GITHUB_STEP_SUMMARY
+          echo '   curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook" \\' >> $GITHUB_STEP_SUMMARY
+          echo '        -H "Content-Type: application/json" \\' >> $GITHUB_STEP_SUMMARY
+          echo '        -d '"'"'{"url": "${{ steps.deployment.outputs.webhook_url }}'"'"'' >> $GITHUB_STEP_SUMMARY
+          echo "   ```" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "2. Test the bot by sending a WeChat article link" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed!"
+          echo "Please check the logs above for details."

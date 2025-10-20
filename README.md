@@ -1,93 +1,141 @@
 # Telegram 微信公众号转 Telegraph Bot
 
-一个运行在 Cloudflare Workers 上的 Telegram 机器人，用于将微信公众号文章转换为 Telegraph 页面。当前版本专注于文章转换，不包含频道管理、数据库或管理员端点。
+[![Deploy to Cloudflare Workers](https://github.com/PBnicad/telegram-wechat-to-telegraph-bot/workflows/Deploy%20to%20Cloudflare%20Workers/badge.svg)](https://github.com/PBnicad/telegram-wechat-to-telegraph-bot/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![zread](https://img.shields.io/badge/Ask_Zread-_.svg?style=flat&color=00b0aa&labelColor=000000&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB3aWR0aD0iMTYiIGhlaWdodD0iMTYiIHZpZXdCb3g9IjAgMCAxNiAxNiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTQuOTYxNTYgMS42MDAxSDIuMjQxNTZDMS44ODgxIDEuNjAwMSAxLjYwMTU2IDEuODg2NjQgMS42MDE1NiAyLjI0MDFWNC45NjAxQzEuNjAxNTYgNS4zMTM1NiAxLjg4ODEgNS42MDAxIDIuMjQxNTYgNS42MDAxSDQuOTYxNTZDNS4zMTUwMiA1LjYwMDEgNS42MDE1NiA1LjMxMzU2IDUuNjAxNTYgNC45NjAxVjIuMjQwMUM1LjYwMTU2IDEuODg2NjQgNS4zMTUwMiAxLjYwMDEgNC45NjE1NiAxLjYwMDFaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00Ljk2MTU2IDEwLjM5OTlIMi4yNDE1NkMxLjg4ODEgMTAuMzk5OSAxLjYwMTU2IDEwLjY4NjQgMS42MDE1NiAxMS4wMzk5VjEzLjc1OTlDMS42MDE1NiAxNC4xMTM0IDEuODg4MSAxNC4zOTk5IDIuMjQxNTYgMTQuMzk5OUg0Ljk2MTU2QzUuMzE1MDIgMTQuMzk5OSA1LjYwMTU2IDE0LjExMzQgNS42MDE1NiAxMy43NTk5VjExLjAzOTlDNS42MDE1NiAxMC42ODY0IDUuMzE1MDIgMTAuMzk5OSA0Ljk2MTU2IDEwLjM5OTlaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik0xMy43NTg0IDEuNjAwMUgxMS4wMzg0QzEwLjY4NSAxLjYwMDEgMTAuMzk4NCAxLjg4NjY0IDEwLjM5ODQgMi4yNDAxVjQuOTYwMUMxMC4zOTg0IDUuMzEzNTYgMTAuNjg1IDUuNjAwMSAxMS4wMzg0IDUuNjAwMUgxMy43NTg0QzE0LjExMTkgNS42MDAxIDE0LjM5ODQgNS4zMTM1NiAxNC4zOTg0IDQuOTYwMVYyLjI0MDFDMTQuMzk4NCAxLjg4NjY0IDE0LjExMTkgMS42MDAxIDEzLjc1ODQgMS42MDAxWiIgZmlsbD0iI2ZmZiIvPgo8cGF0aCBkPSJNNCAxMkwxMiA0TDQgMTJaIiBmaWxsPSIjZmZmIi8%2BCjxwYXRoIGQ9Ik00IDEyTDEyIDQiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxLjUiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K&logoColor=ffffff)](https://zread.ai/PBnicad/telegram-wechat-to-telegraph-bot)
+🤖 智能的 Telegram 机器人，将微信公众号文章转换为 Telegraph 页面，并支持 AI 智能总结功能。
 
-## 功能特性
+## ✨ 功能特性
 
-- 文章转换：将微信文章链接转换为 Telegraph 页面
-- 智能解析：提取标题、作者和正文内容
-- 简洁交互：直接发送链接即可使用
-- 边缘部署：基于 Cloudflare Workers，响应快速、稳定
+- 📄 **文章转换**: 支持所有微信公众号文章链接转换
+- 🤖 **AI 智能总结**: 使用 DeepSeek API 自动生成文章总结
+- ⚡ **快速转换**: Inline 模式支持在任何聊天中快速转换
+- 🎨 **美观页面**: 自动生成排版优美的 Telegraph 页面
+- 🛡️ **错误处理**: 完善的错误提示和重试机制
+- 🔒 **安全可靠**: 基于 Cloudflare Workers，稳定可靠
 
-## 技术架构
+## 🚀 快速开始
 
-- 运行环境：Cloudflare Workers
-- 解析/转换：自研 WeChat Parser + Telegraph API
-- 交互：Telegram Bot API
+### 方式一：GitHub Actions 自动部署（推荐）
 
-## 快速开始
+1. **Fork 本仓库**
+2. **设置 GitHub Secrets**：
+   - `CLOUDFLARE_API_TOKEN`
+   - `CLOUDFLARE_ACCOUNT_ID`
+   - `TELEGRAM_BOT_TOKEN`
+   - `DEEPSEEK_API_KEY` = 您的DeepSeek API密钥
+   - `TELEGRAPH_ACCESS_TOKEN` (可选)
+3. **推送代码**到 main 分支触发自动部署
 
-### 1. 安装依赖
+### 方式二：手动部署
+
 ```bash
+# 克隆仓库
+git clone https://github.com/PBnicad/telegram-wechat-to-telegraph-bot.git
+cd telegram-wechat-to-telegraph-bot
+
+# 安装依赖
 npm install
-```
 
-### 2. 设置 Secrets
-```bash
-# 必需：Telegram Bot Token（从 @BotFather 获取）
-npx wrangler secret put TELEGRAM_BOT_TOKEN
+# 运行设置脚本
+npm run setup
 
-# 可选：Telegraph Access Token（不设置则自动创建）
-npx wrangler secret put TELEGRAPH_ACCESS_TOKEN
-```
-
-### 3. 部署到 Cloudflare Workers
-```bash
+# 手动部署
 npm run deploy
 ```
 
-### 4. 设置 Webhook
-部署成功后，使用以下命令设置 Webhook（替换 YOUR_BOT_TOKEN 和 YOUR_WORKER_URL）：
-```bash
-curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook" \
-     -H "Content-Type: application/json" \
-     -d '{"url": "https://YOUR_WORKER_URL.workers.dev"}'
+详细部署说明请查看 [DEPLOYMENT.md](./DEPLOYMENT.md)
+
+## 📱 使用方法
+
+### 1. 直接发送链接（推荐，包含AI总结）
+
+```
+发送: https://mp.weixin.qq.com/s/xxxxx
+
+收到: 阅读原文 | 预览
+
+🤖 AI总结：
+[文章智能总结内容]
 ```
 
-## 使用说明
+### 2. Inline 模式（快速转换）
 
-- `/start`：显示欢迎信息
-- `/help`：查看帮助
-- 直接发送微信公众号文章链接进行转换
+在任何聊天中输入：`@你的机器人 微信文章链接`
 
-## 文章转换流程
+```
+@wechat2telegraphbot https://mp.weixin.qq.com/s/xxxxx
 
-1. 发送微信公众号文章链接（以 `https://mp.weixin.qq.com/s` 开头）
-2. 机器人获取并解析文章内容
-3. 创建 Telegraph 页面
-4. 返回生成的 Telegraph 链接
+选择结果发送: 阅读原文 | 预览
+```
 
-## 开发指南
+## 🛠️ 技术架构
+
+- **运行平台**: Cloudflare Workers
+- **AI 服务**: DeepSeek API
+- **转换服务**: Telegraph API
+- **开发语言**: JavaScript (ES Modules)
+
+## 📋 环境要求
+
+- Node.js 18+
+- Cloudflare 账户
+- Telegram Bot Token
+- DeepSeek API Key
+
+## 📝 配置说明
+
+### 必需的环境变量
+
+| 变量名 | 说明 | 获取方式 |
+|--------|------|----------|
+| `TELEGRAM_BOT_TOKEN` | Telegram Bot Token | 与 [@BotFather](https://t.me/BotFather) 对话 |
+| `DEEPSEEK_API_KEY` | DeepSeek API 密钥 | 使用预设密钥 |
+
+### 可选的环境变量
+
+| 变量名 | 说明 | 默认值 |
+|--------|------|--------|
+| `TELEGRAPH_ACCESS_TOKEN` | Telegraph Token | 自动创建 |
+
+## 🔄 更新日志
+
+### v1.2.0
+- ✨ 新增 AI 智能总结功能
+- ⚡ 优化 Inline 模式性能
+- 🔧 改进错误处理机制
+
+### v1.1.0
+- 📄 支持微信公众号文章转换
+- 🎨 生成 Telegraph 页面
+- 🤖 支持 Inline 模式
+
+## 🛠️ 开发
 
 ```bash
-# 启动本地开发服务器
+# 安装依赖
+npm install
+
+# 本地开发
 npm run dev
+
+# 验证代码
+npm run validate
+
+# 查看日志
+npm run logs
 ```
 
-## 项目结构
+## 📞 支持
 
-```
-src/
-├── index.js              # Workers 入口
-├── handlers/
-│   ├── message.js        # 文本消息处理
-│   └── callback.js       # 回调查询处理（仅保留转换与取消）
-├── services/
-│   ├── telegram.js       # Telegram API 服务
-│   ├── telegraph.js      # Telegraph API 服务
-│   └── wechat-parser.js  # 微信文章解析器
-└── utils/
-    ├── constants.js      # 常量定义
-    ├── helpers.js        # 辅助函数
-    └── wechat-utils.js   # 微信工具函数
-```
+- 📖 [部署文档](./DEPLOYMENT.md)
+- 🐛 [报告问题](https://github.com/PBnicad/telegram-wechat-to-telegraph-bot/issues)
+- 💬 [讨论区](https://github.com/PBnicad/telegram-wechat-to-telegraph-bot/discussions)
 
-## 常见问题
+## 📄 许可证
 
-- 链接无效：确认链接以 `https://mp.weixin.qq.com/s` 开头
-- 转换失败：稍后重试，或检查网络连接
-- Webhook 未生效：检查 Worker URL 和 Bot Token 是否正确
+本项目采用 [MIT 许可证](LICENSE).
 
-## 许可证
+---
 
-MIT
+⭐ 如果这个项目对您有帮助，请给它一个 Star！

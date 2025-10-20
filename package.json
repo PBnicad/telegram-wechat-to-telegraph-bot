@@ -7,14 +7,11 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "status": "node status-check.js",
-    "secrets:set": "node scripts/set-secrets.js",
-    "secrets:github": "node scripts/set-github-secrets.js",
-    "test": "node scripts/test-connection.js",
-    "lint:check": "echo 'No linter configured'",
-    "lint:fix": "echo 'No linter configured'",
-    "github:check": "node scripts/github-deploy-check.js",
-    "github:secrets-guide": "node scripts/set-github-secrets.js"
+    "setup": "node scripts/setup-secrets.js",
+    "status": "wrangler whoami",
+    "logs": "wrangler tail",
+    "test": "node -c src/index.js && node -c src/handlers/message.js && node -c src/handlers/inline.js",
+    "validate": "npm run test"
   },
   "keywords": ["telegram", "bot", "telegraph", "wechat", "cloudflare-workers"],
   "author": "",
