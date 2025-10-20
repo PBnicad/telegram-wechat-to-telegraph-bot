@@ -2,6 +2,7 @@
  * Telegraph API 服务
  */
 import { TELEGRAPH_API_URL, TELEGRAPH_CONFIG } from '../utils/constants.js';
+import { WeChatImageUtils } from '../utils/wechat-utils.js';
 
 export class TelegraphService {
     constructor(accessToken = null) {
@@ -263,7 +264,7 @@ export class TelegraphService {
                 elements.push({ tag: 'pre', children: [codeText.trim()] });
             } else if (tag === 'figure') {
                 const imgMatch = inner.match(/<img[^>]*src=["']([^"']+)["'][^>]*>/i);
-                const src = imgMatch ? imgMatch[1] : null;
+                const src = imgMatch ? WeChatImageUtils.convertImageUrl(imgMatch[1]) : null;
                 if (src && !/^data:/i.test(src)) elements.push({ tag: 'img', attrs: { src } });
                 const cap = inner.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i);
                 if (cap) elements.push({ tag: 'figcaption', children: parseInlineHtml(cap[1]) });
@@ -282,7 +283,7 @@ export class TelegraphService {
             if (!fragment) return;
             // 独立输出图片，跳过Base64
             for (const im of fragment.matchAll(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi)) {
-                const src = im[1];
+                const src = WeChatImageUtils.convertImageUrl(im[1]);
                 if (src && !/^data:/i.test(src)) out.push({ tag: 'img', attrs: { src } });
             }
             // 文本按段落包装
@@ -335,7 +336,7 @@ export class TelegraphService {
                 if (tag === 'img') {
                     const srcMatch = open.match(/src=["']([^"']+)["']/i);
                     const altMatch = open.match(/alt=["']([^"']+)["']/i);
-                    const src = srcMatch ? srcMatch[1] : '';
+                    const src = srcMatch ? WeChatImageUtils.convertImageUrl(srcMatch[1]) : '';
                     if (src && !/^data:/i.test(src)) {
                         kids.push({ tag: 'img', attrs: altMatch ? { src, alt: altMatch[1] } : { src } });
                     }

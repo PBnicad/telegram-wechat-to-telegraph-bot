@@ -267,8 +267,15 @@ export class WeChatImageUtils {
     static convertImageUrl(imageUrl) {
         if (!imageUrl) return '';
 
+        // 转换微信图片域名，添加 .in 后缀
+        if (imageUrl.includes('wx.qlogo.cn')) {
+            imageUrl = imageUrl.replace('wx.qlogo.cn', 'wx.qlogo.cn.in');
+        } else if (imageUrl.includes('mmbiz.qpic.cn')) {
+            imageUrl = imageUrl.replace('mmbiz.qpic.cn', 'mmbiz.qpic.cn.in');
+        }
+
         // 微信图片URL通常需要添加特定参数才能直接访问
-        if (imageUrl.includes('wx.qlogo.cn') || imageUrl.includes('mmbiz.qpic.cn')) {
+        if (imageUrl.includes('wx.qlogo.cn.in') || imageUrl.includes('mmbiz.qpic.cn.in')) {
             const separator = imageUrl.includes('?') ? '&' : '?';
             return `${imageUrl}${separator}wxtype=jpeg&wxfrom=0`;
         }

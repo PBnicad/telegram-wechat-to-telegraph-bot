@@ -2,6 +2,7 @@
  * 微信公众号解析器 - 基于ParseHub架构
  */
 // 在Cloudflare Workers环境中使用全局fetch
+import { WeChatImageUtils } from '../utils/wechat-utils.js';
 
 export class WeChatParser {
     constructor(options = {}) {
@@ -131,7 +132,7 @@ export class WeChatParser {
             const title = this.extractTitle(html);
             const author = this.extractAuthor(html);
             const content = this.extractContent(html);
-            const images = this.extractImages(html);
+            const images = WeChatImageUtils.filterValidImages(this.extractImages(html));
             const publishTime = this.extractPublishTime(html);
 
             // 生成摘要
