@@ -17,7 +17,12 @@ export class Database {
             INSERT OR REPLACE INTO users (telegram_id, username, first_name, last_name, updated_at)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
         `);
-        return await stmt.bind(telegramId, username, firstName, lastName).run();
+        return await stmt.bind(
+            telegramId,
+            username || null,
+            firstName || null,
+            lastName || null
+        ).run();
     }
 
     // 频道相关操作

@@ -52,7 +52,7 @@ export class TelegraphService {
             title: title || TELEGRAPH_CONFIG.DEFAULT_TITLE,
             content: this.formatContent(content),
             author_name: authorName || TELEGRAPH_CONFIG.AUTHOR_NAME,
-            author_url: authorUrl || TELEGRAPH_CONFIG.AUTHOR_URL,
+            ...(authorUrl || TELEGRAPH_CONFIG.AUTHOR_URL ? { author_url: authorUrl || TELEGRAPH_CONFIG.AUTHOR_URL } : {}),
             return_content: returnContent
         };
 
@@ -86,8 +86,8 @@ export class TelegraphService {
             title: title || TELEGRAPH_CONFIG.DEFAULT_TITLE,
             content: this.formatContent(content),
             author_name: authorName || TELEGRAPH_CONFIG.AUTHOR_NAME,
-            author_url: authorUrl || TELEGRAPH_CONFIG.AUTHOR_URL,
-            return_content
+            ...(authorUrl || TELEGRAPH_CONFIG.AUTHOR_URL ? { author_url: authorUrl || TELEGRAPH_CONFIG.AUTHOR_URL } : {}),
+            return_content: returnContent
         };
 
         try {
@@ -212,19 +212,172 @@ export class TelegraphService {
             return content;
         }
 
-        // 将HTML转换为Telegraph格式
+        // 如果是纯Markdown文本，先转为HTML再解析
+        const looksLikeHtml = /<\s*\w+[^>]*>/i.test(content);
+        if (!looksLikeHtml) {
+            content = convertMarkdownToHtml(content);
+        }
+
+        // 清理不必要的节点
+        const html = content
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+            .replace(/<!--[\s\S]*?-->/g, '');
+
         const elements = [];
 
-        // 处理段落
-        const paragraphs = content.split(/<\/p>/i);
-        for (const paragraph of paragraphs) {
-            const cleanParagraph = paragraph.replace(/<p[^>]*>/i, '').trim();
-            if (cleanParagraph) {
-                elements.push(this.parseHtmlElement(cleanParagraph));
+        // 解析常见块级元素并保留更细粒度的内联样式
+        const blockRegex = /<(h[1-6]|p|blockquote|ul|ol|pre|figure|div)[^>]*>([\s\S]*?)<\/\1>/gi;
+        let last = 0; let m;
+
+        while ((m = blockRegex.exec(html)) !== null) {
+            const before = html.slice(last, m.index);
+            pushInlineFragments(before, elements);
+
+            const tag = m[1].toLowerCase();
+            const inner = m[2];
+
+            if (tag.startsWith('h')) {
+                const level = parseInt(tag.substring(1), 10);
+                const mapped = level <= 2 ? 'h3' : 'h4';
+                elements.push({ tag: mapped, children: parseInlineHtml(inner) });
+            } else if (tag === 'p' || tag === 'div') {
+                pushParagraph(inner, elements);
+            } else if (tag === 'blockquote') {
+                const paras = inner.match(/<p[^>]*>[\s\S]*?<\/p>/gi) || [];
+                if (paras.length) {
+                    elements.push({ tag: 'blockquote', children: paras.map(p => ({ tag: 'p', children: parseInlineHtml(p.replace(/<\/?p[^>]*>/gi, '')) })) });
+                } else {
+                    elements.push({ tag: 'blockquote', children: [{ tag: 'p', children: parseInlineHtml(inner) }] });
+                }
+            } else if (tag === 'ul' || tag === 'ol') {
+                const lis = inner.match(/<li[^>]*>[\s\S]*?<\/li>/gi) || [];
+                const items = lis.map(li => {
+                    const liInner = li.replace(/<\/?li[^>]*>/gi, '');
+                    return { tag: 'li', children: parseInlineHtml(liInner) };
+                });
+                if (items.length) elements.push({ tag, children: items });
+            } else if (tag === 'pre') {
+                const codeMatch = inner.match(/<code[^>]*>([\s\S]*?)<\/code>/i);
+                const codeText = decodeEntities((codeMatch ? codeMatch[1] : inner).replace(/<[^>]+>/g, ''));
+                elements.push({ tag: 'pre', children: [codeText.trim()] });
+            } else if (tag === 'figure') {
+                const imgMatch = inner.match(/<img[^>]*src=["']([^"']+)["'][^>]*>/i);
+                const src = imgMatch ? imgMatch[1] : null;
+                if (src && !/^data:/i.test(src)) elements.push({ tag: 'img', attrs: { src } });
+                const cap = inner.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i);
+                if (cap) elements.push({ tag: 'figcaption', children: parseInlineHtml(cap[1]) });
+            }
+
+            last = blockRegex.lastIndex;
+        }
+
+        const tail = html.slice(last);
+        pushInlineFragments(tail, elements);
+
+        return elements.length > 0 ? elements : [{ tag: 'p', children: ['内容解析失败'] }];
+
+        // ==== 辅助函数：内联解析与实体解码 ====
+        function pushInlineFragments(fragment, out) {
+            if (!fragment) return;
+            // 独立输出图片，跳过Base64
+            for (const im of fragment.matchAll(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi)) {
+                const src = im[1];
+                if (src && !/^data:/i.test(src)) out.push({ tag: 'img', attrs: { src } });
+            }
+            // 文本按段落包装
+            const children = parseInlineHtml(fragment.replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, ''));
+            const paragraphKids = children.filter(n => !(typeof n === 'object' && n.tag === 'img'));
+            if (paragraphKids.some(n => typeof n === 'string' ? n.trim() : true)) {
+                out.push({ tag: 'p', children: paragraphKids.length ? paragraphKids : ['\u00A0'] });
             }
         }
 
-        return elements.length > 0 ? elements : [{ tag: 'p', children: ['内容解析失败'] }];
+        function pushParagraph(inner, out) {
+            const children = parseInlineHtml(inner);
+            const textChildren = children.filter(n => !(typeof n === 'object' && n.tag === 'img'));
+            if (textChildren.length) out.push({ tag: 'p', children: textChildren });
+            for (const n of children) {
+                if (typeof n === 'object' && n.tag === 'img') {
+                    const src = n.attrs?.src;
+                    if (src && !/^data:/i.test(src)) out.push(n);
+                }
+            }
+        }
+
+        function parseInlineHtml(fragment) {
+            const kids = [];
+            let s = fragment
+                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+
+            while (s.length) {
+                const m = s.match(/<(br|img|a|b|strong|i|em|code)[^>]*>/i);
+                if (!m) {
+                    const text = stripRemainingTags(s);
+                    if (text) kids.push(text);
+                    break;
+                }
+
+                const before = s.slice(0, m.index);
+                const beforeText = stripRemainingTags(before);
+                if (beforeText) kids.push(beforeText);
+
+                const tag = m[1].toLowerCase();
+                const open = m[0];
+                s = s.slice(m.index + m[0].length);
+
+                if (tag === 'br') {
+                    kids.push({ tag: 'br' });
+                    continue;
+                }
+
+                if (tag === 'img') {
+                    const srcMatch = open.match(/src=["']([^"']+)["']/i);
+                    const altMatch = open.match(/alt=["']([^"']+)["']/i);
+                    const src = srcMatch ? srcMatch[1] : '';
+                    if (src && !/^data:/i.test(src)) {
+                        kids.push({ tag: 'img', attrs: altMatch ? { src, alt: altMatch[1] } : { src } });
+                    }
+                    continue;
+                }
+
+                const close = s.match(new RegExp(`</${tag}\\s*>`, 'i'));
+                const inner = close ? s.slice(0, close.index) : '';
+                s = close ? s.slice(close.index + close[0].length) : s;
+
+                const nested = parseInlineHtml(inner);
+
+                if (tag === 'a') {
+                    const href = (open.match(/href=["']([^"']+)["']/i) || [null, ''])[1];
+                    kids.push({ tag: 'a', attrs: { href }, children: nested.length ? nested : [stripRemainingTags(inner)] });
+                } else if (tag === 'b' || tag === 'strong') {
+                    kids.push({ tag: 'b', children: nested.length ? nested : [stripRemainingTags(inner)] });
+                } else if (tag === 'i' || tag === 'em') {
+                    kids.push({ tag: 'i', children: nested.length ? nested : [stripRemainingTags(inner)] });
+                } else if (tag === 'code') {
+                    kids.push({ tag: 'code', children: [decodeEntities(inner.replace(/<[^>]+>/g, ''))] });
+                }
+            }
+
+            return kids.filter(n => !(typeof n === 'string' && !n.trim()));
+        }
+
+        function stripRemainingTags(s) {
+            return decodeEntities(s
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<[^>]*>/g, '')
+                .replace(/&nbsp;/g, ' '));
+        }
+
+        function decodeEntities(s) {
+            return s
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/&amp;/g, '&')
+                .replace(/&quot;/g, '"')
+                .replace(/&#39;/g, "'");
+        }
     }
 
     /**
@@ -425,4 +578,124 @@ export class TelegraphService {
     hasValidAccessToken() {
         return !!this.accessToken;
     }
+}
+
+// 将常见Markdown转换为简单HTML，供后续HTML解析使用
+function convertMarkdownToHtml(markdown) {
+    if (!markdown) return '<p></p>';
+
+    // 解码常见实体
+    let md = markdown.replace(/&amp;/g, '&');
+
+    const lines = md.split(/\r?\n/);
+    const htmlParts = [];
+    let inCode = false;
+    let codeBuffer = [];
+    let listBuffer = [];
+    let listType = null; // 'ul' 或 'ol'
+    let paragraphBuffer = [];
+
+    const flushParagraph = () => {
+        if (paragraphBuffer.length) {
+            const text = paragraphBuffer.join(' ').trim();
+            if (text) htmlParts.push(`<p>${text}</p>`);
+            paragraphBuffer = [];
+        }
+    };
+
+    const flushList = () => {
+        if (listBuffer.length) {
+            const items = listBuffer.map(item => `<li>${item}</li>`).join('');
+            htmlParts.push(`<${listType}>${items}</${listType}>`);
+            listBuffer = [];
+            listType = null;
+        }
+    };
+
+    for (let rawLine of lines) {
+        let line = rawLine.trimEnd();
+
+        // 代码块
+        if (/^```/.test(line)) {
+            if (inCode) {
+                htmlParts.push(`<pre>${codeBuffer.join('\n')}</pre>`);
+                codeBuffer = [];
+                inCode = false;
+            } else {
+                flushParagraph();
+                flushList();
+                inCode = true;
+            }
+            continue;
+        }
+
+        if (inCode) {
+            codeBuffer.push(rawLine);
+            continue;
+        }
+
+        // 空行：结束段落或列表
+        if (!line.trim()) {
+            flushParagraph();
+            flushList();
+            continue;
+        }
+
+        // 标题
+        const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+        if (headingMatch) {
+            flushParagraph();
+            flushList();
+            const level = headingMatch[1].length;
+            const text = headingMatch[2];
+            htmlParts.push(`<h${level}>${text}</h${level}>`);
+            continue;
+        }
+
+        // 引用
+        const quoteMatch = line.match(/^>\s+(.*)$/);
+        if (quoteMatch) {
+            flushParagraph();
+            flushList();
+            htmlParts.push(`<blockquote>${quoteMatch[1]}</blockquote>`);
+            continue;
+        }
+
+        // 列表项（无序/有序）
+        const ulMatch = line.match(/^([*\-•])\s+(.*)$/);
+        const olMatch = line.match(/^\d+\.\s+(.*)$/);
+        if (ulMatch || olMatch) {
+            flushParagraph();
+            const itemText = (ulMatch ? ulMatch[2] : olMatch[1]).trim();
+            const desiredType = ulMatch ? 'ul' : 'ol';
+            if (!listType) listType = desiredType;
+            if (listType !== desiredType) {
+                flushList();
+                listType = desiredType;
+            }
+            listBuffer.push(itemText);
+            continue;
+        }
+
+        // 行内：图片与链接
+        line = line
+            .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">')
+            .replace(/\[([^\]]*)\]\(([^)]+)\)/g, (m, text, url) => `<a href="${url}">${text || '链接'}</a>`);
+
+        // 加粗/斜体（简单处理）
+        line = line
+            .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+            .replace(/\*([^*]+)\*/g, '<i>$1</i>');
+
+        paragraphBuffer.push(line.trim());
+    }
+
+    // 收尾
+    flushParagraph();
+    flushList();
+    if (inCode) {
+        htmlParts.push(`<pre>${codeBuffer.join('\n')}</pre>`);
+    }
+
+    return htmlParts.join('\n');
 }

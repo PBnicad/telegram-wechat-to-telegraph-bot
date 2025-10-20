@@ -58,67 +58,26 @@ export class CallbackHandler {
      * @param {object} callbackQuery
      */
     async handleSendToChannel(callbackQuery) {
-        const { id, from, message } = callbackQuery;
-        const [_, telegraphUrl, channelId] = callbackQuery.data.split(':');
+        const { data, message } = callbackQuery;
+        const [_, telegraphUrl, channelId] = data.split(':');
 
         try {
-            // 获取频道信息
-            const channel = await this.getChannelById(channelId);
-            if (!channel) {
-                await this.telegram.answerCallbackQuery(id, '频道不存在', true);
-                return;
-            }
+            // 直接发送仅含两个超链接的消息到频道
+            const channelMessage = `<a href="${message.text.match(/https?:\/\/[^\s]+/)[0]}">阅读原文</a> | <a href="${telegraphUrl}">预览</a>`;
+            await this.telegram.sendMessage(channelId, channelMessage);
 
-            // 获取文章信息
-            const article = await this.db.getArticleByTelegraphUrl(telegraphUrl);
-            if (!article) {
-                await this.telegram.answerCallbackQuery(id, '文章不存在', true);
-                return;
-            }
-
-            // 构建频道消息
-            const channelMessage = `📖 **${article.title}**
-
-${article.summary ? `📝 ${article.summary}\n\n` : ''}🔗 [阅读原文](${article.original_url})
-📖 [Telegraph版本](${article.telegraph_url})
-
-✨ 由 @${from.username || 'Telegram Bot'} 转换`;
-
-            // 发送到频道
-            await this.telegram.sendMessage(channel.channel_id, channelMessage, {
-                parse_mode: 'Markdown'
-            });
-
-            // 确认操作
-            await this.telegram.answerCallbackQuery(
-                id,
-                `✅ 已发送到频道: ${channel.title}`,
-                false
-            );
-
-            // 更新原消息
+            // 更新原始消息为仅两个超链接
             await this.telegram.editMessageText(
                 message.chat.id,
                 message.message_id,
-                `✅ 文章已成功发送到 **${channel.title}**！
-
-📄 ${article.title}
-
-🔗 原文链接：
-${article.original_url}
-
-📖 Telegraph链接：
-${article.telegraph_url}`,
-                { parse_mode: 'Markdown' }
+                channelMessage
             );
 
+            // 结束回调交互
+            await this.telegram.answerCallbackQuery(callbackQuery.id, '已发送到频道');
         } catch (error) {
             console.error('Error sending to channel:', error);
-            await this.telegram.answerCallbackQuery(
-                id,
-                '发送失败，请检查机器人是否在频道中有发送权限',
-                true
-            );
+            await this.telegram.answerCallbackQuery(callbackQuery.id, '发送失败，请重试');
         }
     }
 

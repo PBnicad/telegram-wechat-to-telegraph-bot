@@ -68,7 +68,7 @@ export default {
                 return new Response(JSON.stringify({
                     status: 'running',
                     version: 'image-processing',
-                    features: ['wechat-crawler', 'image-base64', 'telegraph-api'],
+                    features: ['wechat-crawler', 'telegraph-api', 'preserve-inline-styles', 'no-base64-images'],
                     timestamp: new Date().toISOString()
                 }), {
                     headers: { 'Content-Type': 'application/json' }
@@ -94,11 +94,12 @@ export default {
                             '*🎉 欢迎使用 @wechat2telegraphbot！*\n\n' +
                             '*📖 主要功能：*\n' +
                             '• 转换微信公众号文章为Telegraph页面\n' +
-                            '• 支持图片Base64处理和保存\n' +
+                            '• 保留更细粒度的内联样式（粗体/斜体/链接/代码）\n' +
+                            '• 保留原始图片URL，避免Base64\n' +
                             '• 智能反爬策略\n\n' +
                             '*📝 使用方法：*\n' +
                             '• 发送微信公众号文章链接\n' +
-                            '• 发送 `/help` 查看更多命令\n\n' +
+                            '• 发送  /help  查看更多命令\n\n' +
                             '*🚀 开始使用吧！*',
                             env
                         );
@@ -106,8 +107,8 @@ export default {
 
                     case '/help':
                         let helpMessage = '*📖 命令列表：*\n\n' +
-                            '🏠 `/start` - 开始使用\n' +
-                            '❓ `/help` - 查看帮助\n\n' +
+                            '🏠  /start  - 开始使用\n' +
+                            '❓  /help  - 查看帮助\n\n' +
                             '*📝 功能说明：*\n' +
                             '• 发送微信公众号文章链接进行转换\n' +
                             '• 内嵌到Telegraph页面\n' +
@@ -115,10 +116,10 @@ export default {
 
                         if (isSuperAdmin) {
                             helpMessage += '\n*👑 超级管理员命令：*\n' +
-                                '➕ `/add_admin <user_id>` - 添加管理员\n' +
-                                '➖ `/remove_admin <user_id>` - 移除管理员\n' +
-                                '📋 `/list_admins` - 查看管理员列表\n' +
-                                '👑 `/add_super_admin <user_id>` - 添加超级管理员\n';
+                                '➕  /add_admin <user_id>` - 添加管理员\n' +
+                                '➖  /remove_admin <user_id>  - 移除管理员\n' +
+                                '📋  /list_admins  - 查看管理员列表\n' +
+                                '👑  /add_super_admin <user_id>  - 添加超级管理员\n';
                         }
 
                         helpMessage += '\n*📞 需要帮助？请联系管理员*';
@@ -180,7 +181,7 @@ export default {
                         } else {
                             await sendMessage(chatId,
                                 '*❓ 未知命令：* `' + command + '`\n\n' +
-                                '*📖 发送* `/help` *查看可用命令*'
+                                '*📖 发送* /help` *查看可用命令*'
                             );
                         }
                 }
@@ -309,48 +310,19 @@ export default {
 
                 console.log('发现图片数量:', imgMatches.length);
 
-                for (let i = 0; i < imgMatches.length; i++) {
-                    const imgTag = imgMatches[0];
-                    const srcMatch = imgTag.match(/src=["']([^"']+)["']/i);
+                // 仅解析并替换为完整URL，不做Base64
+                processedContent = processedContent.replace(imgRegex, (fullTag, src) => {
+                    const fullImageUrl = resolveImageUrl(src, originalUrl);
+                    imageCount++;
+                    processedImages.push({ original: src, full: fullImageUrl });
+                    // 仅替换 src 属性，保留其他属性和样式
+                    return fullTag.replace(/src=["'][^"']+["']/i, `src="${fullImageUrl}"`);
+                });
 
-                    if (srcMatch && srcMatch[1]) {
-                        const originalSrc = srcMatch[1];
-                        console.log(`处理图片 ${i + 1}/${imgMatches.length}:`, originalSrc);
-
-                        try {
-                            // 构造完整的图片URL
-                            const fullImageUrl = resolveImageUrl(originalSrc, originalUrl);
-                            console.log('完整图片URL:', fullImageUrl);
-
-                            // 下载并转换为Base64
-                            const base64Image = await downloadAndConvertToBase64(fullImageUrl);
-
-                            if (base64Image) {
-                                // 替换原图片标签
-                                const newImgTag = `<img src="${base64Image}" alt="文章图片" style="max-width: 100%; height: auto;">`;
-                                processedContent = processedContent.replace(imgTag, newImgTag);
-
-                                imageCount++;
-                                processedImages.push({
-                                    original: originalSrc,
-                                    full: fullImageUrl,
-                                    base64: base64Image.substring(0, 50) + '...'
-                                });
-
-                                console.log(`✅ 图片 ${i + 1} 处理成功`);
-                            } else {
-                                console.log(`❌ 图片 ${i + 1} 处理失败`);
-                            }
-                        } catch (imgError) {
-                            console.error(`图片 ${i + 1} 处理异常:`, imgError.message);
-                        }
-                    }
-                }
-
-                console.log('图片处理完成:', {
+                console.log('图片URL标准化完成:', {
                     totalFound: imgMatches.length,
-                    successfullyProcessed: imageCount,
-                    processedImages: processedImages.length
+                    standardized: imageCount,
+                    samples: processedImages.slice(0, 3)
                 });
 
             } catch (error) {
@@ -667,7 +639,7 @@ export default {
                     const authorMatch = html.match(pattern);
                     if (authorMatch) {
                         author = authorMatch[1].trim();
-                        if (author && author !== '原创') {
+                        if (author && author !== '未知作者') {
                             break;
                         }
                     }
@@ -687,7 +659,7 @@ export default {
                     content = contentMatch[1];
                 }
 
-                content = cleanContent(content);
+                // 保留原始HTML，避免早期清理导致格式和图片丢失
 
                 console.log('文章解析结果:', {
                     title: title || '未找到标题',
@@ -698,7 +670,7 @@ export default {
 
                 return {
                     title: title || '未命名文章',
-                    author: author || '@wechat2telegraphbot', // 默认使用机器人名称
+                    author: author || 'wechat2telegraphbot', // 默认使用机器人名称
                     content: content,
                     summary: generateSummary(content),
                     wordCount: countWords(content),
@@ -716,7 +688,7 @@ export default {
             try {
                 const lines = text.split('\n');
                 let title = lines[0] || '未命名文章';
-                let author = '@wechat2telegraphbot'; // 默认作者
+                let author = 'wechat2telegraphbot'; // 默认作者
                 let content = text;
 
                 content = content.replace(/^.*?\n/, '');
@@ -883,7 +855,7 @@ export default {
                 const telegraphContent = convertToTelegraphFormat(articleData.content);
 
                 // 确保作者名称不为空且格式正确
-                const botAuthor = env?.BOT_AUTHOR || '@wechat2telegraphbot';
+                const botAuthor = env?.BOT_AUTHOR || 'wechat2telegraphbot';
                 const authorName = articleData.author && articleData.author.trim()
                     ? articleData.author.trim()
                     : botAuthor;
@@ -900,14 +872,21 @@ export default {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        access_token: accessToken,
-                        title: articleData.title || '未命名文章',
-                        author_name: authorName,
-                        author_url: `https://t.me/${env?.BOT_NAME || 'wechat2telegraphbot'}`,
-                        content: telegraphContent,
-                        return_content: false
-                    })
+                    body: JSON.stringify((() => {
+                        const payload = {
+                            access_token: accessToken,
+                            title: articleData.title || '未命名文章',
+                            author_name: authorName,
+                            content: telegraphContent,
+                            return_content: false
+                        };
+                        // 仅在明确提供 BOT_AUTHOR_URL 时传入作者链接
+                        const authorUrl = env?.BOT_AUTHOR_URL || '';
+                        if (authorUrl) {
+                            payload.author_url = authorUrl;
+                        }
+                        return payload;
+                    })())
                 });
 
                 const result = await response.json();
@@ -940,18 +919,25 @@ export default {
                 // 否则创建新的Telegraph账户
                 const telegraphApiUrl = env?.TELEGRAPH_API_URL || 'https://api.telegra.ph';
                 const botName = env?.BOT_NAME || 'wechat2telegraph';
-                const botAuthor = env?.BOT_AUTHOR || '@wechat2telegraphbot';
+                const botAuthor = env?.BOT_AUTHOR || 'wechat2telegraphbot';
 
                 const response = await fetch(`${telegraphApiUrl}/createAccount`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        short_name: botName,
-                        author_name: botAuthor,
-                        author_url: `https://t.me/${botName}`
-                    })
+                    body: JSON.stringify((() => {
+                        const payload = {
+                            short_name: botName,
+                            author_name: botAuthor
+                        };
+                        // 仅在明确提供 BOT_AUTHOR_URL 时传入作者链接
+                        const authorUrl = env?.BOT_AUTHOR_URL || '';
+                        if (authorUrl) {
+                            payload.author_url = authorUrl;
+                        }
+                        return payload;
+                    })())
                 });
 
                 const result = await response.json();
@@ -969,66 +955,177 @@ export default {
             }
         }
 
-        // 转换内容为Telegraph格式 - 纯文本版本
+        // 转换内容为Telegraph格式 - 基于HTML解析，保留加粗/斜体等内联样式，且不使用Base64
         function convertToTelegraphFormat(content) {
             if (!content) {
                 return [{ tag: 'p', children: ['内容为空'] }];
             }
 
-            let elements = [];
+            // 移除脚本、样式与注释
+            const html = content
+                .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+                .replace(/<!--[\s\S]*?-->/g, '');
 
-            // 按段落分割内容
-            const paragraphs = content.split(/\n\n+/);
+            const nodes = [];
 
-            for (const paragraph of paragraphs) {
-                const trimmedParagraph = paragraph.trim();
+            // 顺序解析常见块级元素
+            const blockRegex = /<(h[1-6]|p|blockquote|ul|ol|pre|figure)[^>]*>([\s\S]*?)<\/\1>/gi;
+            let last = 0; let m;
 
-                if (!trimmedParagraph) continue;
+            while ((m = blockRegex.exec(html)) !== null) {
+                const before = html.slice(last, m.index);
+                pushInlineFragments(before, nodes);
 
-                // 处理列表项
-                if (trimmedParagraph.startsWith('• ')) {
-                    const listItems = trimmedParagraph.split('\n');
-                    for (const item of listItems) {
-                        const trimmedItem = item.trim();
-                        if (trimmedItem && trimmedItem.startsWith('• ')) {
-                            elements.push({
-                                tag: 'li',
-                                children: [trimmedItem.substring(2).trim()]
-                            });
+                const tag = m[1].toLowerCase();
+                const inner = m[2];
+
+                if (tag.startsWith('h')) {
+                    const level = parseInt(tag.substring(1), 10);
+                    const mapped = level <= 2 ? 'h3' : 'h4'; // Telegraph支持的标题有限，做兼容映射
+                    nodes.push({ tag: mapped, children: parseInlineHtml(inner) });
+                } else if (tag === 'p') {
+                    pushParagraph(inner, nodes);
+                } else if (tag === 'blockquote') {
+                    const paras = inner.match(/<p[^>]*>[\s\S]*?<\/p>/gi) || [];
+                    if (paras.length) {
+                        nodes.push({ tag: 'blockquote', children: paras.map(p => ({ tag: 'p', children: parseInlineHtml(p.replace(/<\/?.*?p[^>]*>/gi, '')) })) });
+                    } else {
+                        nodes.push({ tag: 'blockquote', children: [{ tag: 'p', children: parseInlineHtml(inner) }] });
+                    }
+                } else if (tag === 'ul' || tag === 'ol') {
+                    const lis = inner.match(/<li[^>]*>[\s\S]*?<\/li>/gi) || [];
+                    const items = lis.map(li => {
+                        const liInner = li.replace(/<\/?li[^>]*>/gi, '');
+                        return { tag: 'li', children: parseInlineHtml(liInner) };
+                    });
+                    if (items.length) nodes.push({ tag, children: items });
+                } else if (tag === 'pre') {
+                    const codeMatch = inner.match(/<code[^>]*>([\s\S]*?)<\/code>/i);
+                    const codeText = decodeEntities((codeMatch ? codeMatch[1] : inner).replace(/<[^>]+>/g, ''));
+                    nodes.push({ tag: 'pre', children: [codeText.trim()] });
+                } else if (tag === 'figure') {
+                    const imgMatch = inner.match(/<img[^>]*src=["']([^"']+)["'][^>]*>/i);
+                    const src = imgMatch ? imgMatch[1] : null;
+                    if (src && !/^data:/i.test(src)) nodes.push({ tag: 'img', attrs: { src } });
+                    const cap = inner.match(/<figcaption[^>]*>([\s\S]*?)<\/figcaption>/i);
+                    if (cap) nodes.push({ tag: 'figcaption', children: parseInlineHtml(cap[1]) });
+                }
+
+                last = blockRegex.lastIndex;
+            }
+
+            const tail = html.slice(last);
+            pushInlineFragments(tail, nodes);
+
+            return nodes.length ? nodes : [{ tag: 'p', children: ['内容解析失败'] }];
+
+            // ==== 辅助函数区 ====
+
+            // 处理散落片段中的图片和文本（文本按<p>包装；图片独立输出）。
+            function pushInlineFragments(fragment, out) {
+                if (!fragment) return;
+                // 独立输出图片，且跳过Base64
+                for (const im of fragment.matchAll(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi)) {
+                    const src = im[1];
+                    if (src && !/^data:/i.test(src)) out.push({ tag: 'img', attrs: { src } });
+                }
+                // 其余文本用段落包装，并保留内联样式
+                const children = parseInlineHtml(fragment.replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, ''));
+                const paragraphKids = children.filter(n => !(typeof n === 'object' && n.tag === 'img'));
+                if (paragraphKids.some(n => typeof n === 'string' ? n.trim() : true)) {
+                    out.push({ tag: 'p', children: paragraphKids.length ? paragraphKids : ['\u00A0'] });
+                }
+            }
+
+            // 生成段落并提取其中图片（图片独立输出；段落保留内联样式）
+            function pushParagraph(inner, out) {
+                const children = parseInlineHtml(inner);
+                const textChildren = children.filter(n => !(typeof n === 'object' && n.tag === 'img'));
+                if (textChildren.length) out.push({ tag: 'p', children: textChildren });
+                for (const n of children) {
+                    if (typeof n === 'object' && n.tag === 'img') {
+                        const src = n.attrs?.src;
+                        if (src && !/^data:/i.test(src)) out.push(n);
+                    }
+                }
+            }
+
+            // 内联解析：保留<b>/<i>/<a>/<code>/<br>，并跳过Base64图片
+            function parseInlineHtml(fragment) {
+                const kids = [];
+                let s = fragment
+                    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+                    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+
+                while (s.length) {
+                    const m = s.match(/<(br|img|a|b|strong|i|em|code)[^>]*>/i);
+                    if (!m) {
+                        const text = stripRemainingTags(s);
+                        if (text) kids.push(text);
+                        break;
+                    }
+
+                    const before = s.slice(0, m.index);
+                    const beforeText = stripRemainingTags(before);
+                    if (beforeText) kids.push(beforeText);
+
+                    const tag = m[1].toLowerCase();
+                    const open = m[0];
+                    s = s.slice(m.index + m[0].length);
+
+                    if (tag === 'br') {
+                        kids.push({ tag: 'br' });
+                        continue;
+                    }
+
+                    if (tag === 'img') {
+                        const srcMatch = open.match(/src=["']([^"']+)["']/i);
+                        const altMatch = open.match(/alt=["']([^"']+)["']/i);
+                        const src = srcMatch ? srcMatch[1] : '';
+                        if (src && !/^data:/i.test(src)) {
+                            kids.push({ tag: 'img', attrs: altMatch ? { src, alt: altMatch[1] } : { src } });
                         }
+                        continue;
                     }
-                }
-                // 处理图片
-                else if (trimmedParagraph.includes('<img src="data:image/')) {
-                    // 提取Base64图片
-                    const imgMatch = trimmedParagraph.match(/<img[^>]*src="([^"]*)"[^>]*>/);
-                    if (imgMatch) {
-                        elements.push({
-                            tag: 'img',
-                            attrs: { src: imgMatch[1] }
-                        });
-                    }
-                }
-                // 处理普通段落
-                else {
-                    // 将多行文本合并为一个段落
-                    const paragraphText = trimmedParagraph.replace(/\n/g, ' ');
 
-                    if (paragraphText) {
-                        elements.push({
-                            tag: 'p',
-                            children: [paragraphText]
-                        });
+                    const close = s.match(new RegExp(`</${tag}\\s*>`, 'i'));
+                    const inner = close ? s.slice(0, close.index) : '';
+                    s = close ? s.slice(close.index + close[0].length) : s;
+
+                    const nested = parseInlineHtml(inner);
+
+                    if (tag === 'a') {
+                        const href = (open.match(/href=["']([^"']+)["']/i) || [null, ''])[1];
+                        kids.push({ tag: 'a', attrs: { href }, children: nested.length ? nested : [stripRemainingTags(inner)] });
+                    } else if (tag === 'b' || tag === 'strong') {
+                        kids.push({ tag: 'b', children: nested.length ? nested : [stripRemainingTags(inner)] });
+                    } else if (tag === 'i' || tag === 'em') {
+                        kids.push({ tag: 'i', children: nested.length ? nested : [stripRemainingTags(inner)] });
+                    } else if (tag === 'code') {
+                        kids.push({ tag: 'code', children: [decodeEntities(inner.replace(/<[^>]+>/g, ''))] });
                     }
                 }
+
+                return kids.filter(n => !(typeof n === 'string' && !n.trim()));
             }
 
-            // 如果没有有效元素，返回默认内容
-            if (elements.length === 0) {
-                return [{ tag: 'p', children: ['内容解析失败'] }];
+            // 去标签 + 解码实体
+            function stripRemainingTags(s) {
+                return decodeEntities(s
+                    .replace(/<br\s*\/?>/gi, '\n')
+                    .replace(/<[^>]*>/g, '')
+                    .replace(/&nbsp;/g, ' '));
             }
 
-            return elements;
+            function decodeEntities(s) {
+                return s
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&quot;/g, '"')
+                    .replace(/&#39;/g, "'");
+            }
         }
 
         // 保存文章记录

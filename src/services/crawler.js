@@ -282,38 +282,11 @@ export class CrawlerService {
      * @returns {string} Telegraph格式的内容
      */
     convertToTelegraphFormat(content) {
-        // 将HTML转换为Telegraph支持的格式
-        let telegraphContent = content;
-
-        // 处理图片
-        telegraphContent = telegraphContent.replace(
-            /<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi,
-            '<img src="$1" alt="$2">'
-        );
-
-        // 处理链接
-        telegraphContent = telegraphContent.replace(
-            /<a[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/gi,
-            '<a href="$1">$2</a>'
-        );
-
-        // 处理段落
-        telegraphContent = telegraphContent.replace(/<p[^>]*>/gi, '<p>');
-        telegraphContent = telegraphContent.replace(/<div[^>]*>/gi, '<p>');
-        telegraphContent = telegraphContent.replace(/<\/div>/gi, '</p>');
-
-        // 处理标题
-        telegraphContent = telegraphContent.replace(/<h([1-6])[^>]*>/gi, '<h$1>');
-        telegraphContent = telegraphContent.replace(/<strong[^>]*>/gi, '<b>');
-        telegraphContent = telegraphContent.replace(/<\/strong>/gi, '</b>');
-        telegraphContent = telegraphContent.replace(/<em[^>]*>/gi, '<i>');
-        telegraphContent = telegraphContent.replace(/<\/em>/gi, '</i>');
-
-        // 清理多余的空标签
-        telegraphContent = telegraphContent.replace(/<[^>]*><\/[^>]*>/g, '');
-        telegraphContent = telegraphContent.replace(/\s+/g, ' ');
-
-        return telegraphContent.trim();
+        // 统一由 TelegraphService.formatContent 处理，这里仅透传原始内容
+        if (Array.isArray(content)) {
+            return content;
+        }
+        return typeof content === 'string' ? content.trim() : '';
     }
 
     /**

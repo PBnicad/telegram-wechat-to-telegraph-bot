@@ -1,6 +1,7 @@
 name = "telegram-wechat-bot"
-main = "src/index-image.js"
-compatibility_date = "2024-01-01"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
 
 # Development environment
 [env.development]
@@ -43,7 +44,7 @@ database_id = "5c10a2c2-73ac-45db-a6d9-e170cc6e7331"
 [vars]
 # Bot configuration
 BOT_NAME = "wechat2telegraphbot"
-BOT_AUTHOR = "@wechat2telegraphbot"
+BOT_AUTHOR = "wechat2telegraphbot"
 BOT_DESCRIPTION = "Convert WeChat articles to Telegraph pages"
 
 # Service endpoints
@@ -54,6 +55,13 @@ JINA_AI_API_URL = "https://r.jina.ai"
 DEFAULT_LANGUAGE = "zh-CN"
 MAX_IMAGE_SIZE = 10485760
 REQUEST_TIMEOUT = 30000
+
+# WeChat Parser Configuration
+WECHAT_PARSER_QUALITY = "default"
+PARSE_TIMEOUT = 30000
+MAX_RETRIES = 3
+ENABLE_IMAGES_EXTRACTION = true
+ENABLE_MARKDOWN_CONVERSION = true
 
 [observability]
 [observability.logs]

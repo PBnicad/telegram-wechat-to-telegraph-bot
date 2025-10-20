@@ -78,7 +78,7 @@ export const HTTP_CONFIG = {
 // Telegraph账户配置
 export const TELEGRAPH_CONFIG = {
     AUTHOR_NAME: 'Telegram Bot',
-    AUTHOR_URL: 'https://t.me/your_bot_username',
+    AUTHOR_URL: 'https://t.me/wechat2telegraphbot',
     DEFAULT_TITLE: '未命名文章'
 };
 

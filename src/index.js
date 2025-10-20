@@ -9,6 +9,7 @@ import { CrawlerService } from './services/crawler.js';
 import { TelegraphService } from './services/telegraph.js';
 import { MessageHandler } from './handlers/message.js';
 import { CallbackHandler } from './handlers/callback.js';
+import { wechatConfigManager } from './config/wechat-config.js';
 
 export default {
     async fetch(request, env, ctx) {
@@ -78,24 +79,24 @@ export default {
                 return new Response('Not Found', { status: 404 });
             }
 
-            // 处理根路径
-            if (path === '/') {
-                return new Response(JSON.stringify({
-                    status: 'running',
-                    service: 'Telegram WeChat to Telegraph Bot',
-                    version: '1.0.0',
-                    endpoints: {
-                        health: '/health',
-                        admin: '/admin/stats (requires API key)',
-                        webhook: '/ (Telegram webhook endpoint)'
-                    }
-                }), {
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            }
-
             // Telegram Webhook 处理 (只接受 POST)
             if (request.method !== 'POST') {
+                // 处理根路径 (仅GET请求)
+                if (path === '/' && request.method === 'GET') {
+                    return new Response(JSON.stringify({
+                        status: 'running',
+                        service: 'Telegram WeChat to Telegraph Bot',
+                        version: '1.0.0',
+                        endpoints: {
+                            health: '/health',
+                            admin: '/admin/stats (requires API key)',
+                            webhook: '/ (Telegram webhook endpoint)'
+                        }
+                    }), {
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                }
+
                 return new Response(JSON.stringify({
                     error: 'Method not allowed',
                     message: 'This endpoint only accepts POST requests for Telegram webhooks',
@@ -126,8 +127,21 @@ export default {
             const crawlerService = new CrawlerService();
             const telegraphService = new TelegraphService(env.TELEGRAPH_ACCESS_TOKEN);
 
-            // 初始化处理器
-            const messageHandler = new MessageHandler(db, telegramService, crawlerService, telegraphService);
+            // 获取解析器配置
+            const wechatConfig = wechatConfigManager.getConfig(env.WECHAT_PARSER_QUALITY || 'default');
+
+            // 初始化处理器（使用新的配置）
+            const messageHandler = new MessageHandler(
+                db,
+                telegramService,
+                crawlerService,
+                telegraphService,
+                {
+                    parseTimeout: wechatConfig.timeout,
+                    userAgent: wechatConfig.userAgent,
+                    proxy: env.PROXY_URL || wechatConfig.proxy
+                }
+            );
             const callbackHandler = new CallbackHandler(db, telegramService, crawlerService, telegraphService);
 
             let update;
