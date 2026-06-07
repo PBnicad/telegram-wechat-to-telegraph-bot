@@ -4,6 +4,7 @@
  */
 import { WeChatImageUtils } from '../utils/wechat-utils.js';
 import TurndownService from 'turndown';
+import { parseHTML } from 'linkedom';
 
 export class WeChatParser {
     constructor(options = {}) {
@@ -262,11 +263,13 @@ export class WeChatParser {
     /**
      * HTML 转 Markdown
      * 使用 TurndownService + 自定义微信图片规则
+     * 在 Cloudflare Workers 中没有 DOM，需要用 linkedom 创建 document
      * @param {string} html HTML内容
      * @returns {string} Markdown内容
      */
     htmlToMarkdown(html) {
-        return this.turndownService.turndown(html);
+        const { document } = parseHTML(`<!DOCTYPE html><html><body>${html}</body></html>`);
+        return this.turndownService.turndown(document.body);
     }
 
     /**

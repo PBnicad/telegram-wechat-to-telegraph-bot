@@ -3,6 +3,10 @@ main = "src/index.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
+# Workers AI binding (free tier available)
+[ai]
+binding = "AI"
+
 # Development environment
 [env.development]
 name = "telegram-wechat-bot-dev"
@@ -21,15 +25,11 @@ name = "telegram-wechat-bot-prod"
 # Environment variables
 # Required secrets (set using: wrangler secret put <VARIABLE_NAME>):
 # - TELEGRAM_BOT_TOKEN: Your Telegram Bot Token
-# - SUPER_ADMIN_ID: Default super admin Telegram user ID
 # Optional secrets:
-# - ADMIN_API_KEY: Admin API key for management endpoints
 # - TELEGRAPH_ACCESS_TOKEN: Telegraph account access token (will auto-create if not provided)
 
 # Secrets setup commands:
 # wrangler secret put TELEGRAM_BOT_TOKEN
-# wrangler secret put SUPER_ADMIN_ID
-# wrangler secret put ADMIN_API_KEY
 # wrangler secret put TELEGRAPH_ACCESS_TOKEN
 
 # Public environment variables
@@ -41,7 +41,6 @@ BOT_DESCRIPTION = "Convert WeChat articles to Telegraph pages"
 
 # Service endpoints
 TELEGRAPH_API_URL = "https://api.telegra.ph"
-JINA_AI_API_URL = "https://r.jina.ai"
 
 # Default configuration
 DEFAULT_LANGUAGE = "zh-CN"

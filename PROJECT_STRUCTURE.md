@@ -16,16 +16,16 @@ telegram-wechat-to-telegraph-bot/
 │   │   ├── inline.js                 # Inline 查询处理器
 │   │   └── message.js                # 消息处理器（包含AI总结）
 │   ├── services/
-│   │   ├── deepseek.js               # DeepSeek API 服务（AI总结）
 │   │   ├── telegram.js               # Telegram API 服务
-│   │   ├── telegraph.js              # Telegraph API 服务
-│   │   └── wechat-parser.js          # 微信文章解析器
+│   │   ├── telegraph.js              # Telegraph API 服务（含 MD→HTML 清洗管线）
+│   │   ├── wechat-parser.js          # 微信文章解析器（Turndown + data-src 规则）
+│   │   └── workers-ai.js             # Cloudflare Workers AI 服务（Qwen3 总结）
 │   ├── types/
 │   │   └── wechat.js                 # 微信相关类型定义
 │   ├── utils/
 │   │   ├── constants.js              # 常量定义
 │   │   ├── helpers.js                # 辅助函数
-│   │   └── wechat-utils.js           # 微信工具函数
+│   │   └── wechat-utils.js           # 微信工具函数（图片代理等）
 │   └── index.js                      # Cloudflare Workers 入口文件
 ├── .wrangler/                        # Wrangler 临时文件
 ├── node_modules/                     # 依赖包
@@ -41,7 +41,7 @@ telegram-wechat-to-telegraph-bot/
 ### 1. 消息处理流程 (`src/handlers/message.js`)
 - **微信文章解析**: 调用 WeChatParser 解析文章内容
 - **Telegraph 页面创建**: 生成美观的 Telegraph 页面
-- **AI 总结生成**: 调用 DeepSeek API 生成智能总结
+- **AI 总结生成**: 调用 Workers AI (Qwen3) 生成智能总结
 - **错误处理**: 完善的错误处理和用户提示
 
 ### 2. Inline 模式 (`src/handlers/inline.js`)
@@ -49,15 +49,20 @@ telegram-wechat-to-telegraph-bot/
 - **简洁响应**: 只返回原文和预览链接
 - **性能优化**: 不包含 AI 总结，响应更快
 
-### 3. AI 总结服务 (`src/services/deepseek.js`)
-- **DeepSeek API 集成**: 调用 DeepSeek Chat API
-- **智能总结**: 生成简洁准确的文章总结
+### 3. AI 总结服务 (`src/services/workers-ai.js`)
+- **Cloudflare Workers AI 绑定**: 通过 env.AI 直接调用，无需 API Key
+- **模型**: @cf/qwen/qwen3-30b-a3b-fp8（中文能力强，免费）
 - **错误容错**: AI 总结失败不影响主要功能
 
 ### 4. 微信解析器 (`src/services/wechat-parser.js`)
-- **文章内容提取**: 提取标题、作者、正文等内容
-- **格式转换**: 将 HTML 内容转换为 Markdown
-- **图片处理**: 处理和优化图片链接
+- **Turndown 转换**: 自定义 wechatImages 规则，优先读 data-src 属性
+- **域名替换**: mmbiz.qpic.cn → qpic.cn.in/mmbiz.qpic.cn（图片代理）
+- **格式转换**: HTML → Markdown（与 parsehub 管线一致）
+
+### 5. Telegraph 服务 (`src/services/telegraph.js`)
+- **MD→HTML**: 使用 Marked 库转换 Markdown 为 HTML
+- **HTML 清洗**: cleanArticleHtml 白名单过滤（照搬 parsehub 逻辑）
+- **节点解析**: 将清洗后的 HTML 解析为 Telegraph 节点数组
 
 ## 🔧 部署方式
 
@@ -85,10 +90,13 @@ telegram-wechat-to-telegraph-bot/
 
 ### 必需的 Secrets
 - `TELEGRAM_BOT_TOKEN`: Telegram Bot Token
-- `DEEPSEEK_API_KEY`: DeepSeek API 密钥（已预设）
 
 ### 可选的 Secrets
 - `TELEGRAPH_ACCESS_TOKEN`: Telegraph Token（自动创建）
+
+### Workers AI 配置
+- 在 `wrangler.toml` 中通过 `[ai]` binding 自动启用
+- 无需额外 API Key
 
 ## 🛠️ 开发工具
 

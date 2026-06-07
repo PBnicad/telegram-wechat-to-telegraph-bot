@@ -16,7 +16,6 @@
    CLOUDFLARE_API_TOKEN=your_cloudflare_api_token
    CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id
    TELEGRAM_BOT_TOKEN=your_telegram_bot_token
-   DEEPSEEK_API_KEY=your_deepseek_api_key
    TELEGRAPH_ACCESS_TOKEN=your_telegraph_token (可选)
    ```
 
@@ -24,7 +23,6 @@
    - **Cloudflare API Token**: 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/profile/api-tokens) 创建 token
    - **Cloudflare Account ID**: 在 Cloudflare Dashboard 侧边栏找到
    - **Telegram Bot Token**: 与 [@BotFather](https://t.me/BotFather) 对话创建机器人获取
-   - **DeepSeek API Key**: 您的DeepSeek API密钥
 
 4. **触发部署**：
    - 推送代码到 main 分支，或
@@ -36,6 +34,8 @@
         -H "Content-Type: application/json" \
         -d '{"url": "https://telegram-wechat-bot.nicad.workers.dev"}'
    ```
+
+> **AI 总结功能**使用 Cloudflare Workers AI，通过 `wrangler.toml` 中的 `[ai]` binding 自动启用，无需额外配置 API Key。
 
 ## 🔧 手动部署
 
@@ -60,17 +60,16 @@
 
 3. **登录 Cloudflare**
    ```bash
-   wrangler login
+   npx wrangler login
    ```
 
 4. **设置 Secrets**
    ```bash
    # 必需
-   echo "your_telegram_bot_token" | wrangler secret put TELEGRAM_BOT_TOKEN
-   echo "your_deepseek_api_key" | wrangler secret put DEEPSEEK_API_KEY
+   echo "your_telegram_bot_token" | npx wrangler secret put TELEGRAM_BOT_TOKEN
 
    # 可选（不设置则自动创建 Telegraph 账户）
-   echo "your_telegraph_token" | wrangler secret put TELEGRAPH_ACCESS_TOKEN
+   echo "your_telegraph_token" | npx wrangler secret put TELEGRAPH_ACCESS_TOKEN
    ```
 
 5. **部署**
@@ -90,7 +89,7 @@
 ### ✅ 支持的功能
 
 - **微信公众号文章转换**: 支持所有微信公众号文章链接
-- **AI 智能总结**: 使用 DeepSeek API 自动生成文章总结
+- **AI 智能总结**: 使用 Cloudflare Workers AI (Qwen3) 自动生成文章总结
 - **Telegraph 页面创建**: 自动生成美观的 Telegraph 页面
 - **Inline 模式**: 在任何聊天中使用 `@机器人 微信链接` 快速转换
 - **错误处理**: 完善的错误提示和重试机制
@@ -142,23 +141,27 @@
    - 查看 Cloudflare Workers 日志
 
 2. **AI 总结不工作**
-   - 确认 DEEPSEEK_API_KEY 已正确设置
-   - 检查 DeepSeek API 额度是否充足
+   - 确认 `wrangler.toml` 中有 `[ai]` binding 配置
    - 查看 Workers 日志中的错误信息
+   - Cloudflare Workers AI 免费额度每天 10,000 次请求
 
 3. **文章解析失败**
    - 确认链接格式正确：`https://mp.weixin.qq.com/s/xxxxx`
    - 检查文章是否已被删除
    - 尝试刷新页面后重新发送链接
 
+4. **图片不显示**
+   - 确认图片使用 `qpic.cn.in` 代理域名
+   - 检查 WeChat 图片原始链接是否可访问
+
 ### 查看日志
 
 ```bash
 # 实时查看 Workers 日志
-wrangler tail
+npx wrangler tail
 
 # 查看最近的日志
-wrangler tail --since 1h
+npx wrangler tail --since 1h
 ```
 
 ## 📝 配置说明
@@ -168,7 +171,6 @@ wrangler tail --since 1h
 | 变量名 | 必需 | 说明 |
 |--------|------|------|
 | `TELEGRAM_BOT_TOKEN` | ✅ | Telegram Bot Token |
-| `DEEPSEEK_API_KEY` | ✅ | DeepSeek API 密钥，用于AI总结 |
 | `TELEGRAPH_ACCESS_TOKEN` | ❌ | Telegraph Token，不设置则自动创建 |
 
 ### 功能配置
@@ -182,7 +184,6 @@ wrangler tail --since 1h
 
 ### 自动更新
 - 推送代码到 main 分支自动触发部署
-- GitHub Actions 会自动设置新的 secrets
 
 ### 手动更新
 ```bash

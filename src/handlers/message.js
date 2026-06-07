@@ -4,7 +4,7 @@
 import { Messages, Commands } from '../utils/constants.js';
 import { isValidUrl, isWechatArticle, extractWeChatUrl } from '../utils/helpers.js';
 import { WeChatParser } from '../services/wechat-parser.js';
-import { DeepSeekService } from '../services/deepseek.js';
+import { WorkersAIService } from '../services/workers-ai.js';
 import { WeChatParseResult, WeChatParseError } from '../types/wechat.js';
 
 export class MessageHandler {
@@ -21,11 +21,8 @@ export class MessageHandler {
             proxy: options.proxy || null
         });
 
-        // 初始化DeepSeek服务
-        this.deepseekService = new DeepSeekService(
-            options.deepseekApiKey,
-            options.deepseekModel || 'deepseek-chat'
-        );
+        // 初始化Workers AI服务
+        this.aiService = new WorkersAIService(options.env);
     }
 
     /**
@@ -198,9 +195,9 @@ export class MessageHandler {
             // 尝试生成AI总结
             let aiSummary = null;
             console.log('🤖 开始AI总结流程...');
-            console.log('DeepSeek服务配置状态:', this.deepseekService.isConfigured());
+            console.log('Workers AI服务配置状态:', this.aiService.isConfigured());
 
-            if (this.deepseekService.isConfigured()) {
+            if (this.aiService.isConfigured()) {
                 try {
                     console.log('📝 更新处理状态：正在生成AI总结...');
                     await this.telegram.editMessageText(
@@ -209,11 +206,11 @@ export class MessageHandler {
                         `📝 已创建Telegraph页面，正在生成AI总结...`
                     );
 
-                    console.log('🤖 调用DeepSeek API生成总结...');
+                    console.log('🤖 调用Workers AI生成总结...');
                     console.log('文章标题:', wechatResult.title);
                     console.log('内容长度:', wechatResult.content?.length || 0);
 
-                    aiSummary = await this.deepseekService.summarizeArticle(
+                    aiSummary = await this.aiService.summarizeArticle(
                         wechatResult.title,
                         wechatResult.content,
                         wechatResult.author
@@ -232,7 +229,7 @@ export class MessageHandler {
                     // AI总结失败不影响主流程，继续执行
                 }
             } else {
-                console.log('⚠️ DeepSeek服务未配置，跳过AI总结');
+                console.log('⚠️ Workers AI服务未配置，跳过AI总结');
             }
 
             // 保存到数据库 - 临时注释掉以调试

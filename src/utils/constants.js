@@ -26,8 +26,7 @@ export const Messages = {
     CONVERSION_SUCCESS: '✅ 转换成功！',
     CONVERSION_FAILED: '❌ 转换失败，请稍后重试。',
     SUMMARY_PROCESSING: '🤖 正在生成AI总结，请稍候...',
-    SUMMARY_FAILED: '❌ AI总结生成失败，请稍后重试。',
-    NO_DEEPSEEK_KEY: '❌ AI总结服务暂时不可用，请稍后重试。'
+    SUMMARY_FAILED: '❌ AI总结生成失败，请稍后重试。'
 };
 
 // 键盘按钮
