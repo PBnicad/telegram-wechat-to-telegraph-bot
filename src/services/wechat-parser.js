@@ -1,8 +1,9 @@
 /**
- * 微信公众号解析器 - 基于ParseHub架构
+ * 微信公众号解析器
+ * 管线：HTML → Turndown(MD) → 域名替换 → (后续由 telegraph.js 完成 MD→HTML→清洗→节点)
  */
-// 在Cloudflare Workers环境中使用全局fetch
 import { WeChatImageUtils } from '../utils/wechat-utils.js';
+import TurndownService from 'turndown';
 
 export class WeChatParser {
     constructor(options = {}) {
@@ -12,6 +13,24 @@ export class WeChatParser {
             proxy: null,
             ...options
         };
+
+        // 初始化 Turndown，配置与 parsehub 的 WXConverter(heading_style="ATX") 一致
+        this.turndownService = new TurndownService({
+            headingStyle: 'atx',
+            bulletListMarker: '-',
+            codeBlockStyle: 'fenced'
+        });
+
+        // 自定义图片规则：优先读 data-src（微信懒加载），与 parsehub 的 WXConverter 完全一致
+        this.turndownService.addRule('wechatImages', {
+            filter: 'img',
+            replacement: function (content, node) {
+                const alt = node.getAttribute('alt') || '';
+                const src = node.getAttribute('data-src') || node.getAttribute('src') || '';
+                if (!src || src.startsWith('data:')) return '';
+                return `![${alt}](${src})`;
+            }
+        });
     }
 
     /**
@@ -52,7 +71,6 @@ export class WeChatParser {
      */
     cleanUrl(url) {
         try {
-            // 确保URL有协议
             let fullUrl = url;
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 fullUrl = `https://${url}`;
@@ -128,14 +146,13 @@ export class WeChatParser {
      */
     parseHtml(html, url) {
         try {
-            // 使用正则表达式解析（避免依赖DOM解析库）
             const title = this.extractTitle(html);
             const author = this.extractAuthor(html);
             const content = this.extractContent(html);
             const images = WeChatImageUtils.filterValidImages(this.extractImages(html));
             const publishTime = this.extractPublishTime(html);
 
-            // 生成摘要
+            // 生成摘要（content是Markdown格式）
             const summary = this.generateSummary(content);
 
             // 计算字数
@@ -163,7 +180,6 @@ export class WeChatParser {
      * @returns {string}
      */
     extractTitle(html) {
-        // 尝试多种标题提取方式
         const patterns = [
             /<h1[^>]*class="[^"]*rich_media_title[^"]*"[^>]*>(.*?)<\/h1>/is,
             /<title[^>]*>(.*?)<\/title>/is,
@@ -203,35 +219,54 @@ export class WeChatParser {
     }
 
     /**
-     * 提取文章内容
+     * 提取文章内容并转为Markdown
+     * 管线：提取HTML → 清洗 → Turndown转MD → 域名替换 → 返回MD
      * @param {string} html
-     * @returns {string}
+     * @returns {string} Markdown内容
      */
     extractContent(html) {
         // 提取富媒体内容区域
         const contentPatterns = [
-            /<div[^>]*class="[^"]*rich_media_content[^"]*"[^>]*>(.*?)<\/div>/is,
-            /<div[^>]*id="js_content"[^>]*>(.*?)<\/div>/is
+            /<div[^>]*class="[^"]*rich_media_content[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<(?:script|div)/i,
+            /<div[^>]*class="[^"]*rich_media_content[^"]*"[^>]*>([\s\S]*?)<\/div>/i,
+            /<div[^>]*id="js_content"[^>]*>([\s\S]*?)<\/div>\s*<(?:script|div)/i,
+            /<div[^>]*id="js_content"[^>]*>([\s\S]*?)<\/div>/i
         ];
 
-        let content = '';
+        let contentHtml = '';
         for (const pattern of contentPatterns) {
             const match = html.match(pattern);
             if (match) {
-                content = match[1];
+                contentHtml = match[1];
                 break;
             }
         }
 
-        if (!content) {
+        if (!contentHtml) {
             return '无法提取文章内容';
         }
 
-        // 清理内容
-        content = this.cleanContent(content);
+        // 清理内容（移除脚本、样式、注释）
+        contentHtml = this.cleanContent(contentHtml);
 
-        // 转换为Markdown格式
-        return this.convertToMarkdown(content);
+        // HTML → Markdown（与 parsehub 的 WXConverter 一致，自定义规则读 data-src）
+        let markdown = this.htmlToMarkdown(contentHtml);
+
+        // 域名替换（与 parsehub 的 create_richtext_telegraph 一致）
+        markdown = markdown.replace(/mmbiz\.qpic\.cn/g, 'qpic.cn.in/mmbiz.qpic.cn');
+        markdown = markdown.replace(/wx\.qlogo\.cn/g, 'qpic.cn.in/wx.qlogo.cn');
+
+        return markdown;
+    }
+
+    /**
+     * HTML 转 Markdown
+     * 使用 TurndownService + 自定义微信图片规则
+     * @param {string} html HTML内容
+     * @returns {string} Markdown内容
+     */
+    htmlToMarkdown(html) {
+        return this.turndownService.turndown(html);
     }
 
     /**
@@ -304,7 +339,7 @@ export class WeChatParser {
 
     /**
      * 清理内容
-     * @param {string} content
+     * @param {string} content HTML内容
      * @returns {string}
      */
     cleanContent(content) {
@@ -312,86 +347,21 @@ export class WeChatParser {
             .replace(/<script[^>]*>.*?<\/script>/gis, '') // 移除脚本
             .replace(/<style[^>]*>.*?<\/style>/gis, '') // 移除样式
             .replace(/<!--.*?-->/gis, '') // 移除注释
-            .replace(/\s+/g, ' ') // 压缩空白字符
             .trim();
     }
 
     /**
-     * 转换为Markdown格式
-     * @param {string} html
-     * @returns {string}
-     */
-    convertToMarkdown(html) {
-        let markdown = html;
-
-        // 处理标题
-        markdown = markdown.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n\n');
-        markdown = markdown.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n\n');
-        markdown = markdown.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n\n');
-        markdown = markdown.replace(/<h4[^>]*>(.*?)<\/h4>/gi, '#### $1\n\n');
-        markdown = markdown.replace(/<h5[^>]*>(.*?)<\/h5>/gi, '##### $1\n\n');
-        markdown = markdown.replace(/<h6[^>]*>(.*?)<\/h6>/gi, '###### $1\n\n');
-
-        // 处理段落
-        markdown = markdown.replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n');
-
-        // 处理加粗
-        markdown = markdown.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**');
-        markdown = markdown.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**');
-
-        // 处理斜体
-        markdown = markdown.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*');
-        markdown = markdown.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*');
-
-        // 处理链接
-        markdown = markdown.replace(/<a[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)');
-
-        // 处理图片
-        markdown = markdown.replace(/<img[^>]*data-src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi, '![$2]($1)');
-        markdown = markdown.replace(/<img[^>]*src="([^"]*)"[^>]*alt="([^"]*)"[^>]*>/gi, '![$2]($1)');
-        markdown = markdown.replace(/<img[^>]*data-src="([^"]*)"[^>]*>/gi, '![]($1)');
-        markdown = markdown.replace(/<img[^>]*src="([^"]*)"[^>]*>/gi, '![]($1)');
-
-        // 处理换行
-        markdown = markdown.replace(/<br[^>]*>/gi, '\n');
-
-        // 处理列表
-        markdown = markdown.replace(/<ul[^>]*>(.*?)<\/ul>/gis, (match, content) => {
-            return content.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n');
-        });
-
-        markdown = markdown.replace(/<ol[^>]*>(.*?)<\/ol>/gis, (match, content) => {
-            let index = 1;
-            return content.replace(/<li[^>]*>(.*?)<\/li>/gi, () => `${index++}. $1\n`);
-        });
-
-        // 处理代码块
-        markdown = markdown.replace(/<pre[^>]*><code[^>]*>(.*?)<\/code><\/pre>/gis, '```\n$1\n```\n\n');
-        markdown = markdown.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`');
-
-        // 处理引用
-        markdown = markdown.replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gis, '> $1\n\n');
-
-        // 清理剩余的HTML标签
-        markdown = markdown.replace(/<[^>]*>/g, '');
-
-        // 清理多余的空行
-        markdown = markdown.replace(/\n{3,}/g, '\n\n');
-
-        return markdown.trim();
-    }
-
-    /**
-     * 生成摘要
-     * @param {string} content
+     * 生成摘要（content是Markdown格式）
+     * @param {string} content Markdown内容
      * @returns {string}
      */
     generateSummary(content) {
-        // 移除Markdown格式
+        // 从Markdown中提取纯文本
         const plainText = content
-            .replace(/[#*`\[\]()>_~-]/g, '')
             .replace(/!\[.*?\]\(.*?\)/g, '[图片]')
-            .replace(/\[.*?\]\(.*?\)/g, '$1')
+            .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+            .replace(/#{1,6}\s+/g, '')
+            .replace(/[*`_~]/g, '')
             .replace(/\n+/g, ' ')
             .trim();
 
@@ -405,20 +375,21 @@ export class WeChatParser {
     }
 
     /**
-     * 计算字数
-     * @param {string} content
+     * 计算字数（content是Markdown格式）
+     * @param {string} content Markdown内容
      * @returns {number}
      */
     countWords(content) {
-        // 移除Markdown格式，只计算实际内容
+        // 从Markdown中提取纯文本
         const plainText = content
-            .replace(/[#*`\[\]()>_~-]/g, '')
             .replace(/!\[.*?\]\(.*?\)/g, '')
-            .replace(/\[.*?\]\(.*?\)/g, '$1')
+            .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+            .replace(/#{1,6}\s+/g, '')
+            .replace(/[*`_~]/g, '')
             .trim();
 
         // 中文按字符计算，英文按单词计算
-        const chineseChars = (plainText.match(/[\u4e00-\u9fa5]/g) || []).length;
+        const chineseChars = (plainText.match(/[一-龥]/g) || []).length;
         const englishWords = (plainText.match(/[a-zA-Z]+/g) || []).length;
 
         return chineseChars + englishWords;

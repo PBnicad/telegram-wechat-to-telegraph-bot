@@ -1,5 +1,5 @@
 /**
- * 消息处理器 - 基于ParseHub架构重构
+ * 消息处理器
  */
 import { Messages, Commands } from '../utils/constants.js';
 import { isValidUrl, isWechatArticle, extractWeChatUrl } from '../utils/helpers.js';
@@ -124,7 +124,7 @@ export class MessageHandler {
     }
 
     /**
-     * 处理微信公众号URL - 基于ParseHub架构重构
+     * 处理微信公众号URL
      * @param {object} message
      */
     async handleWechatUrl(message) {

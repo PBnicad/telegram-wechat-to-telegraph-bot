@@ -3,6 +3,7 @@
  */
 import { TELEGRAPH_API_URL, TELEGRAPH_CONFIG } from '../utils/constants.js';
 import { WeChatImageUtils } from '../utils/wechat-utils.js';
+import { marked } from 'marked';
 
 export class TelegraphService {
     constructor(accessToken = null) {
@@ -37,7 +38,7 @@ export class TelegraphService {
     /**
      * 创建Telegraph页面
      * @param {string} title 页面标题
-     * @param {string} content 页面内容（HTML格式）
+     * @param {string} content 页面内容（Markdown格式）
      * @param {string} authorName 作者名称
      * @param {string} authorUrl 作者URL
      * @param {boolean} returnContent 是否返回内容
@@ -200,7 +201,8 @@ export class TelegraphService {
 
     /**
      * 格式化内容为Telegraph API要求的格式
-     * @param {string} content HTML内容
+     * 管线：Markdown → HTML(marked) → 清洗(cleanArticleHtml) → 解析为Telegraph节点
+     * @param {string} content Markdown或HTML内容
      * @returns {Array} Telegraph内容数组
      */
     formatContent(content) {
@@ -213,14 +215,20 @@ export class TelegraphService {
             return content;
         }
 
-        // 如果是纯Markdown文本，先转为HTML再解析
+        // Step 1: Markdown → HTML（与 parsehub 的 markdown(md) 一致）
+        let html;
         const looksLikeHtml = /<\s*\w+[^>]*>/i.test(content);
-        if (!looksLikeHtml) {
-            content = convertMarkdownToHtml(content);
+        if (looksLikeHtml) {
+            html = content;
+        } else {
+            html = marked.parse(content);
         }
 
-        // 清理不必要的节点
-        const html = content
+        // Step 2: 清洗HTML（与 parsehub 的 clean_article_html 一致）
+        html = cleanArticleHtml(html);
+
+        // Step 3: 清理脚本和样式
+        html = html
             .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
             .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
             .replace(/<!--[\s\S]*?-->/g, '');
@@ -290,7 +298,7 @@ export class TelegraphService {
             const children = parseInlineHtml(fragment.replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, ''));
             const paragraphKids = children.filter(n => !(typeof n === 'object' && n.tag === 'img'));
             if (paragraphKids.some(n => typeof n === 'string' ? n.trim() : true)) {
-                out.push({ tag: 'p', children: paragraphKids.length ? paragraphKids : ['\u00A0'] });
+                out.push({ tag: 'p', children: paragraphKids.length ? paragraphKids : [' '] });
             }
         }
 
@@ -488,7 +496,7 @@ export class TelegraphService {
         const text = html.replace(/<[^>]*>/g, '').trim();
         return {
             tag: 'p',
-            children: text ? [text] : ['\u00A0'] // 非断行空格
+            children: text ? [text] : [' '] // 非断行空格
         };
     }
 
@@ -581,122 +589,99 @@ export class TelegraphService {
     }
 }
 
-// 将常见Markdown转换为简单HTML，供后续HTML解析使用
-function convertMarkdownToHtml(markdown) {
-    if (!markdown) return '<p></p>';
+/**
+ * 清洗HTML内容，与 parsehub 的 clean_article_html 逻辑完全一致：
+ * 1. h1 → h3, b → strong, h2/h5/h6 → h4
+ * 2. 移除 <head>
+ * 3. 只保留 Telegraph 支持的标签和属性
+ * 4. 规范化空白（保留 <pre> 内的换行）
+ * @param {string} html 输入HTML
+ * @returns {string} 清洗后的HTML
+ */
+function cleanArticleHtml(html) {
+    if (!html) return '';
 
-    // 解码常见实体
-    let md = markdown.replace(/&amp;/g, '&');
+    let result = html;
 
-    const lines = md.split(/\r?\n/);
-    const htmlParts = [];
-    let inCode = false;
-    let codeBuffer = [];
-    let listBuffer = [];
-    let listType = null; // 'ul' 或 'ol'
-    let paragraphBuffer = [];
+    // 标题级别映射：h1 → h3, h2/h5/h6 → h4（Telegraph只支持h3和h4）
+    result = result.replace(/<h1/gi, '<h3').replace(/<\/h1>/gi, '</h3>');
+    result = result.replace(/<h2/gi, '<h4').replace(/<\/h2>/gi, '</h4>');
+    result = result.replace(/<h5/gi, '<h4').replace(/<\/h5>/gi, '</h4>');
+    result = result.replace(/<h6/gi, '<h4').replace(/<\/h6>/gi, '</h4>');
 
-    const flushParagraph = () => {
-        if (paragraphBuffer.length) {
-            const text = paragraphBuffer.join(' ').trim();
-            if (text) htmlParts.push(`<p>${text}</p>`);
-            paragraphBuffer = [];
+    // b → strong（Telegraph使用strong）
+    result = result.replace(/<(\/?)b(\s|>)/gi, '<$1strong$2');
+
+    // 移除 <head> 块
+    result = result.replace(/<head[^a-z][\s\S]*<\/head>/gi, '');
+
+    // 标签白名单（与 parsehub 的 allowed_tags 一致）
+    const allowedTags = new Set([
+        'a', 'aside', 'b', 'blockquote', 'br', 'code', 'em',
+        'figcaption', 'figure', 'h3', 'h4', 'hr', 'i', 'img',
+        'li', 'ol', 'p', 'pre', 's', 'strong', 'u', 'ul', 'video'
+    ]);
+
+    // 属性白名单（与 parsehub 的 safe_attrs 一致）
+    const allowedAttrs = { img: ['src', 'alt'], a: ['href'] };
+
+    // 用正则逐标签过滤
+    result = result.replace(/<(\w+)([^>]*)>/gi, (match, tagName, attrs) => {
+        const tag = tagName.toLowerCase();
+
+        // 闭合标签
+        if (!allowedTags.has(tag)) {
+            return '';
         }
-    };
 
-    const flushList = () => {
-        if (listBuffer.length) {
-            const items = listBuffer.map(item => `<li>${item}</li>`).join('');
-            htmlParts.push(`<${listType}>${items}</${listType}>`);
-            listBuffer = [];
-            listType = null;
-        }
-    };
+        // 解析属性
+        const attrRegex = /(\w+)=["']([^"']*)["']/gi;
+        const allowedForTag = allowedAttrs[tag] || [];
+        let filteredAttrs = '';
+        let attrMatch;
 
-    for (let rawLine of lines) {
-        let line = rawLine.trimEnd();
-
-        // 代码块
-        if (/^```/.test(line)) {
-            if (inCode) {
-                htmlParts.push(`<pre>${codeBuffer.join('\n')}</pre>`);
-                codeBuffer = [];
-                inCode = false;
-            } else {
-                flushParagraph();
-                flushList();
-                inCode = true;
+        while ((attrMatch = attrRegex.exec(attrs)) !== null) {
+            const attrName = attrMatch[1].toLowerCase();
+            const attrValue = attrMatch[2];
+            if (allowedForTag.includes(attrName)) {
+                filteredAttrs += ` ${attrName}="${attrValue}"`;
             }
-            continue;
         }
 
-        if (inCode) {
-            codeBuffer.push(rawLine);
-            continue;
+        return `<${tag}${filteredAttrs}>`;
+    });
+
+    // 移除不在白名单中的闭合标签
+    result = result.replace(/<\/(\w+)>/gi, (match, tagName) => {
+        return allowedTags.has(tagName.toLowerCase()) ? match : '';
+    });
+
+    // 规范化空白（保留 <pre> 内的换行）
+    result = normalizeWhitespace(result);
+
+    return result.trim();
+}
+
+/**
+ * 规范化HTML空白，保留 <pre> 和 <code> 内的换行
+ * @param {string} html
+ * @returns {string}
+ */
+function normalizeWhitespace(html) {
+    // 将 &nbsp; 替换为普通空格
+    html = html.replace(/ /g, ' ');
+
+    // 将连续的 <br> 标签合并为一个换行
+    html = html.replace(/(<br\s*\/?>\s*)+/gi, '\n');
+
+    // 在 <pre>/<code> 外部压缩空白
+    const parts = html.split(/(<pre[^>]*>[\s\S]*?<\/pre>|<code[^>]*>[\s\S]*?<\/code>)/gi);
+    for (let i = 0; i < parts.length; i++) {
+        // 奇数索引是 <pre>/<code> 块，不处理
+        if (i % 2 === 0) {
+            parts[i] = parts[i].replace(/\s+/g, ' ');
         }
-
-        // 空行：结束段落或列表
-        if (!line.trim()) {
-            flushParagraph();
-            flushList();
-            continue;
-        }
-
-        // 标题
-        const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
-        if (headingMatch) {
-            flushParagraph();
-            flushList();
-            const level = headingMatch[1].length;
-            const text = headingMatch[2];
-            htmlParts.push(`<h${level}>${text}</h${level}>`);
-            continue;
-        }
-
-        // 引用
-        const quoteMatch = line.match(/^>\s+(.*)$/);
-        if (quoteMatch) {
-            flushParagraph();
-            flushList();
-            htmlParts.push(`<blockquote>${quoteMatch[1]}</blockquote>`);
-            continue;
-        }
-
-        // 列表项（无序/有序）
-        const ulMatch = line.match(/^([*\-•])\s+(.*)$/);
-        const olMatch = line.match(/^\d+\.\s+(.*)$/);
-        if (ulMatch || olMatch) {
-            flushParagraph();
-            const itemText = (ulMatch ? ulMatch[2] : olMatch[1]).trim();
-            const desiredType = ulMatch ? 'ul' : 'ol';
-            if (!listType) listType = desiredType;
-            if (listType !== desiredType) {
-                flushList();
-                listType = desiredType;
-            }
-            listBuffer.push(itemText);
-            continue;
-        }
-
-        // 行内：图片与链接
-        line = line
-            .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1">')
-            .replace(/\[([^\]]*)\]\(([^)]+)\)/g, (m, text, url) => `<a href="${url}">${text || '链接'}</a>`);
-
-        // 加粗/斜体（简单处理）
-        line = line
-            .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
-            .replace(/\*([^*]+)\*/g, '<i>$1</i>');
-
-        paragraphBuffer.push(line.trim());
     }
 
-    // 收尾
-    flushParagraph();
-    flushList();
-    if (inCode) {
-        htmlParts.push(`<pre>${codeBuffer.join('\n')}</pre>`);
-    }
-
-    return htmlParts.join('\n');
+    return parts.join('');
 }

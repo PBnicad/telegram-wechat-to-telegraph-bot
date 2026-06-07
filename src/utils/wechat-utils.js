@@ -260,22 +260,35 @@ export class WeChatContentUtils {
  */
 export class WeChatImageUtils {
     /**
-     * 转换微信图片URL为直接访问链接
+     * 转换微信图片URL为代理访问链接
+     * 使用 qpic.cn.in 反向代理
+     * 注意：域名替换在 wechat-parser 的 Markdown 阶段已做全局替换，
+     * 此函数用于 formatContent 中对 HTML <img> src 的二次处理，
+     * 需要检测是否已经代理过，避免重复代理。
      * @param {string} imageUrl
      * @returns {string}
      */
     static convertImageUrl(imageUrl) {
         if (!imageUrl) return '';
 
-        // 转换微信图片域名，添加 .in 后缀
-        if (imageUrl.includes('wx.qlogo.cn')) {
-            imageUrl = imageUrl.replace('wx.qlogo.cn', 'wx.qlogo.cn.in');
-        } else if (imageUrl.includes('mmbiz.qpic.cn')) {
-            imageUrl = imageUrl.replace('mmbiz.qpic.cn', 'mmbiz.qpic.cn.in');
+        // 如果已经包含代理域名，只追加参数（不重复代理）
+        if (imageUrl.includes('qpic.cn.in/')) {
+            if (!imageUrl.includes('wxtype=')) {
+                const separator = imageUrl.includes('?') ? '&' : '?';
+                return `${imageUrl}${separator}wxtype=jpeg&wxfrom=0`;
+            }
+            return imageUrl;
         }
 
-        // 微信图片URL通常需要添加特定参数才能直接访问
-        if (imageUrl.includes('wx.qlogo.cn.in') || imageUrl.includes('mmbiz.qpic.cn.in')) {
+        // 使用 qpic.cn.in 代理替换微信图片域名
+        if (imageUrl.includes('mmbiz.qpic.cn')) {
+            imageUrl = imageUrl.replace('mmbiz.qpic.cn', 'qpic.cn.in/mmbiz.qpic.cn');
+        } else if (imageUrl.includes('wx.qlogo.cn')) {
+            imageUrl = imageUrl.replace('wx.qlogo.cn', 'qpic.cn.in/wx.qlogo.cn');
+        }
+
+        // 代理域名图片需要附加参数确保可访问
+        if (imageUrl.includes('qpic.cn.in')) {
             const separator = imageUrl.includes('?') ? '&' : '?';
             return `${imageUrl}${separator}wxtype=jpeg&wxfrom=0`;
         }
@@ -312,7 +325,8 @@ export class WeChatImageUtils {
         );
 
         const isWechatImage = imageUrl.includes('mmbiz.qpic.cn') ||
-                            imageUrl.includes('wx.qlogo.cn');
+                            imageUrl.includes('wx.qlogo.cn') ||
+                            imageUrl.includes('qpic.cn.in');
 
         return hasValidExtension || isWechatImage;
     }
@@ -325,8 +339,8 @@ export class WeChatImageUtils {
     static getImageType(imageUrl) {
         if (!imageUrl) return 'unknown';
 
-        if (imageUrl.includes('mmbiz.qpic.cn')) return 'wechat';
-        if (imageUrl.includes('wx.qlogo.cn')) return 'avatar';
+        if (imageUrl.includes('mmbiz.qpic.cn') || imageUrl.includes('qpic.cn.in/mmbiz')) return 'wechat';
+        if (imageUrl.includes('wx.qlogo.cn') || imageUrl.includes('qpic.cn.in/wx')) return 'avatar';
         if (imageUrl.includes('gif')) return 'gif';
         if (imageUrl.includes('png')) return 'png';
         if (imageUrl.includes('jpg') || imageUrl.includes('jpeg')) return 'jpeg';

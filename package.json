@@ -13,13 +13,20 @@
     "test": "node -c src/index.js && node -c src/handlers/message.js && node -c src/handlers/inline.js",
     "validate": "npm run test"
   },
-  "keywords": ["telegram", "bot", "telegraph", "wechat", "cloudflare-workers"],
+  "keywords": [
+    "telegram",
+    "bot",
+    "telegraph",
+    "wechat",
+    "cloudflare-workers"
+  ],
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "wrangler": "^3.0.0"
   },
   "dependencies": {
-    "htmlparser2": "^9.0.0"
+    "marked": "^18.0.5",
+    "turndown": "^7.2.4"
   }
 }
