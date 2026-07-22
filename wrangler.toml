@@ -1,39 +1,29 @@
+# Cloudflare Workers production service:
+# https://dash.cloudflare.com/23d4ff7e591eac740c917b5ab1ba23d3/workers/services/view/telegram-wechat-bot/production
 name = "telegram-wechat-bot"
+account_id = "23d4ff7e591eac740c917b5ab1ba23d3"
 main = "src/index.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+workers_dev = true
 
 # Workers AI binding (free tier available)
 [ai]
 binding = "AI"
 
-# Development environment
-[env.development]
-name = "telegram-wechat-bot-dev"
-
-# Production environment
-[env.production.vars]
-ENVIRONMENT = "production"
-
-# D1 Database configuration
-
-# Production environment
-[env.production]
-name = "telegram-wechat-bot-prod"
-
-
-# Environment variables
 # Required secrets (set using: wrangler secret put <VARIABLE_NAME>):
 # - TELEGRAM_BOT_TOKEN: Your Telegram Bot Token
 # Optional secrets:
 # - TELEGRAPH_ACCESS_TOKEN: Telegraph account access token (will auto-create if not provided)
-
+#
 # Secrets setup commands:
 # wrangler secret put TELEGRAM_BOT_TOKEN
 # wrangler secret put TELEGRAPH_ACCESS_TOKEN
 
 # Public environment variables
 [vars]
+ENVIRONMENT = "production"
+
 # Bot configuration
 BOT_NAME = "wechat2telegraphbot"
 BOT_AUTHOR = "wechat2telegraphbot"

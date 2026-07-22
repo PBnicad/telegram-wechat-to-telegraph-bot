@@ -9,7 +9,7 @@
     "deploy": "wrangler deploy",
     "setup": "node scripts/setup-secrets.js",
     "status": "wrangler whoami",
-    "logs": "wrangler tail",
+    "logs": "wrangler tail --name telegram-wechat-bot",
     "test": "node -c src/index.js && node -c src/handlers/message.js && node -c src/handlers/inline.js",
     "validate": "npm run test"
   },
