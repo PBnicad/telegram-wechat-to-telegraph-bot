@@ -80,23 +80,22 @@ jobs:
           echo "dashboard_url=https://dash.cloudflare.com/23d4ff7e591eac740c917b5ab1ba23d3/workers/services/view/telegram-wechat-bot/production" >> $GITHUB_OUTPUT
 
       - name: Deployment Summary
+        env:
+          WORKER_URL: ${{ steps.deployment.outputs.worker_url }}
+          DASHBOARD_URL: ${{ steps.deployment.outputs.dashboard_url }}
         run: |
-          echo "## 🚀 Deployment Successful!" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Worker:** \`telegram-wechat-bot\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Account ID:** \`23d4ff7e591eac740c917b5ab1ba23d3\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Worker URL:** ${{ steps.deployment.outputs.worker_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Dashboard:** ${{ steps.deployment.outputs.dashboard_url }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Set up Telegram webhook:" >> $GITHUB_STEP_SUMMARY
-          echo '   ```bash' >> $GITHUB_STEP_SUMMARY
-          echo '   curl -X POST "https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook" \\' >> $GITHUB_STEP_SUMMARY
-          echo '        -H "Content-Type: application/json" \\' >> $GITHUB_STEP_SUMMARY
-          echo '        -d '"'"'{"url": "${{ steps.deployment.outputs.webhook_url }}'"'"'' >> $GITHUB_STEP_SUMMARY
-          echo "   ```" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "2. Test the bot by sending a WeChat article link" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## Deployment Successful"
+            echo ""
+            echo "- **Worker:** telegram-wechat-bot"
+            echo "- **Account ID:** 23d4ff7e591eac740c917b5ab1ba23d3"
+            echo "- **Worker URL:** ${WORKER_URL}"
+            echo "- **Dashboard:** ${DASHBOARD_URL}"
+            echo ""
+            echo "### Next Steps"
+            echo "1. Set Telegram webhook to: \`${WORKER_URL}\`"
+            echo "2. Test the bot by sending a WeChat article link"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Notify on failure
         if: failure()
